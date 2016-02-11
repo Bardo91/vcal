@@ -110,10 +110,13 @@ void PID::enableFastcomPublisher(int _port){
 void PID::enableFastcomSubscriber(int _port){
     #ifdef HAS_FASTCOM
         if(mFastcomSubParams) delete mFastcomSubParams;
-        mFastcomSubParams  = new fastcom::Subscriber<PIDParams>("192.168.1.182", _port);
+        mFastcomSubParams  = new fastcom::Subscriber<PIDParams>("10.0.0.111", _port);
 std::cout << "trying to subscribe" << std::endl;
         mPort = _port;
         auto callback = [this](const PIDParams &_params){
+ignoreCounter++;
+if(ignoreCounter < 10)
+	return;
                 mKp = _params.kp;
                 mKi = _params.ki;
                 mKd = _params.kd;
