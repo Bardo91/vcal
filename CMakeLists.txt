@@ -18,3 +18,151 @@
 ##  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 ##  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ##---------------------------------------------------------------------------------------------------------------------
+
+cmake_minimum_required (VERSION 3.8 FATAL_ERROR)
+project(vcal VERSION 0.1 LANGUAGES C CXX)
+
+##########################################
+######		Configure project		######
+##########################################
+set(BUILD_EXAMPLES OFF)
+
+list(APPEND VCAL_DEFINITIONS "")
+#########################################
+###### Loading 3rd party libraries.######
+#########################################
+if( NOT CMAKE_BUILD_TYPE )
+  set( CMAKE_BUILD_TYPE Release CACHE STRING
+       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+       FORCE )
+endif()
+
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/" ${CMAKE_MODULE_PATH})
+
+#########################################
+## Load opencv
+find_package(OpenCV 3 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
+set_target_properties(${OpenCV_LIBS} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
+
+#########################################
+# vcal
+find_package(vcal REQUIRED)
+
+#########################################
+# fastcom
+find_package(fastcom)
+if(${fastcom_FOUND})
+	list(APPEND VCAL_DEFINITIONS "HAS_FASTCOM")
+if(${fastcom_FOUND})
+
+#########################################
+# catkin
+find_package(catkin REQUIRED roscpp rosbag cv_bridge image_transport sensor_msgs)
+if(${catkin_FOUND})
+	catkin_package(
+		CATKIN_DEPENDS roscpp rosbag cv_bridge image_transport sensor_msgs
+		INCLUDE_DIRS include
+	)
+	list(APPEND VCAL_DEFINITIONS "HAS_ROS")
+endif(${catkin_FOUND})
+
+#########################################
+######			Library 		   ######
+#########################################
+#add_definitions(-fopenmp)
+
+# Collect all sources
+file(GLOB_RECURSE VCAL_SOURCE_FILES "src/*.cpp" "src/*.c")
+file(GLOB_RECURSE VCAL_HEADER_FILES "include/*.h" "include/*.inl")
+ 
+add_library(${PROJECT_NAME} SHARED ${VCAL_SOURCE_FILES} ${VCAL_HEADER_FILES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include) 
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC ${VCAL_DEFINITIONS})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC vcal::vcal)
+
+if(${fastcom_FOUND})
+	target_link_libraries(${PROJECT_NAME} PUBLIC fastcom::fastcom)
+endif(${fastcom_FOUND})
+
+
+if(${catkin_FOUND})
+	target_include_directories(${PROJECT_NAME} PUBLIC ${catkin_INCLUDE_DIRS})
+	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${catkin_LIBRARIES} )
+	add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
+endif(${catkin_FOUND})
+
+#########################################
+######			Documentation	   ######
+#########################################
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+	add_custom_target(	doc_vcal
+						${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+						WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+						COMMENT "Generating API documentation with Doxygen" VERBATIM )
+endif(DOXYGEN_FOUND)
+
+#########################################
+######			Examples 		   ######
+#########################################
+if(${BUILD_EXAMPLES})
+	add_subdirectory(examples)
+endif(${BUILD_EXAMPLES})
+
+#########################################
+######			INSTALL 		   ######
+#########################################
+include(CMakePackageConfigHelpers)
+
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+  set(CMAKE_INSTALL_PREFIX "/usr/local")
+endif() 
+
+install(TARGETS vcal
+        EXPORT vcalTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION ${CMAKE_INSTALL_PREFIX}
+        )
+
+write_basic_package_version_file(
+    vcalConfigVersion.cmake
+    VERSION ${PACKAGE_VERSION}
+    COMPATIBILITY AnyNewerVersion
+    )
+
+
+# This installs the include folder
+install(DIRECTORY include DESTINATION ${CMAKE_INSTALL_PREFIX} FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY include DESTINATION ${CMAKE_INSTALL_PREFIX} FILES_MATCHING PATTERN "*.inl")
+
+export(TARGETS vcal NAMESPACE vcal:: FILE vcalTargets.cmake)
+
+# This generates vcalTargets.cmake
+install(EXPORT vcalTargets
+    FILE vcalTargets.cmake
+    NAMESPACE vcal::
+    DESTINATION lib/cmake/vcal
+    )
+
+configure_file(vcalConfig.cmake.in vcalConfig.cmake @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/vcalConfig.cmake"
+        DESTINATION lib/cmake/vcal
+        )
+
+
+
+# uninstall target 
+if(NOT TARGET uninstall) 
+  configure_file( 
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in" 
+      "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake" 
+      IMMEDIATE @ONLY) 
+ 
+  add_custom_target(uninstall COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake) 
+endif() 
+ 
