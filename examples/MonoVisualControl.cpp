@@ -20,7 +20,7 @@
 //---------------------------------------------------------------------------------------------------------------------
 
 #include <iostream>
-#include <VisualControlScheme.h>
+#include <vcal/VisualControlScheme.h>
 
 
 int main(int _argc, char** _argv){

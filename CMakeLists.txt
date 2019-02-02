@@ -25,7 +25,7 @@ project(vcal VERSION 0.1 LANGUAGES C CXX)
 ##########################################
 ######		Configure project		######
 ##########################################
-set(BUILD_EXAMPLES OFF)
+set(BUILD_EXAMPLES ON)
 
 list(APPEND VCAL_DEFINITIONS "")
 #########################################
@@ -76,7 +76,7 @@ file(GLOB_RECURSE VCAL_SOURCE_FILES "src/*.cpp" "src/*.c")
 file(GLOB_RECURSE VCAL_HEADER_FILES "include/*.h" "include/*.inl")
  
 add_library(${PROJECT_NAME} SHARED ${VCAL_SOURCE_FILES} ${VCAL_HEADER_FILES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include) 
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include) 
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${VCAL_DEFINITIONS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
@@ -105,13 +105,6 @@ if(DOXYGEN_FOUND)
 						WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 						COMMENT "Generating API documentation with Doxygen" VERBATIM )
 endif(DOXYGEN_FOUND)
-
-#########################################
-######			Examples 		   ######
-#########################################
-if(${BUILD_EXAMPLES})
-	add_subdirectory(examples)
-endif(${BUILD_EXAMPLES})
 
 #########################################
 ######			INSTALL 		   ######
@@ -166,3 +159,14 @@ if(NOT TARGET uninstall)
   add_custom_target(uninstall COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake) 
 endif() 
  
+
+#########################################
+######			Examples 		   ######
+#########################################
+if(${BUILD_EXAMPLES})
+    add_executable(example_mono examples/MonoVisualControl.cpp)
+    target_link_libraries(example_mono PRIVATE vcal)
+
+    add_executable(example_depth examples/DepthVisualControl.cpp)
+    target_link_libraries(example_depth PRIVATE vcal)
+endif(${BUILD_EXAMPLES})
