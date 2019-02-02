@@ -21,8 +21,19 @@
 // #include <ros/ros.h>
 #include <thread>
 
+#ifdef HAS_ROS
+    #include <ros/ros.h>
+#endif
+#ifdef HAS_FASTCOM
+    #include <fastcom/fastcom.h>
+#endif
+
 class PID {
 public:
+    struct PIDParams{
+        float kp, ki, kd, sat, wind;
+    };
+
     PID(float _kp, float _ki, float _kd,
         float _minSat = std::numeric_limits<float>::min(),
         float _maxSat = std::numeric_limits<float>::max(),
@@ -31,6 +42,11 @@ public:
     
     float update(float _val, float _incT);
  
+    void enableRosPublisher(std::string _topic);
+    void enableRosSubscriber(std::string _topic);
+    void enableFastcomPublisher(int _port);
+    void enableFastcomSubscriber(int _port);
+
     float reference() { return mReference; }
     void reference(float _ref) { mReference = _ref; mAccumErr = 0; mLastError = 0; mLastResult = 0; mBouncingFactor = 0.1;}
  
@@ -54,8 +70,18 @@ private:
     float mMinSat, mMaxSat;
     float mWindupMin, mWindupMax;
     float mLastResult, mLastError, mAccumErr;
-    // ros::ServiceServer mServiceKp, mServiceKi, mServiceKd, mServiceSat, mServiceWind;
-    // ros::Publisher mPubKp, mPubKi, mPubKd, mPubSat, mPubWind;
     double mBouncingFactor = 0.1;
+    bool mRun = false;
     std::thread mParamPubThread;
+
+    #ifdef HAS_ROS
+        ros::NodeHandle mNH;
+        ros::Publisher mRosPubParams;
+        ros::Subscriber mRosSubParams;
+    #endif
+
+    #ifdef HAS_FASTCOM
+        fastcom::Publisher<PIDParams> *mFastcomPubParams;
+        fastcom::Subscriber<PIDParams> *mFastcomSubParams;
+    #endif
 };

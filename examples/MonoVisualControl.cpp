@@ -21,9 +21,10 @@
 
 #include <iostream>
 #include <vcal/VisualControlScheme.h>
-
+#include <rgbd_tools/utils/Graph2d.h>
 
 int main(int _argc, char** _argv){
+    ros::init(_argc, _argv, "MonoVisualControl");
 
     if(_argc !=2 ){
         std::cout << "Bad Input arguments, provide path to image files template with something red to track" << std::endl;
@@ -36,8 +37,13 @@ int main(int _argc, char** _argv){
     float fx = 510;
     float fy = 510;
 
+    
+    std::vector<double> vx, vy, vz;
     std::function<Eigen::Vector3f(const cv::Mat&)> procImage = [&](const cv::Mat &_img) -> Eigen::Vector3f{
         cv::Mat hsv_image;
+        if(_img.rows == 0)
+            return Eigen::Vector3f();
+
         cv::cvtColor(_img, hsv_image, cv::COLOR_BGR2HSV);
 
         cv::Mat segmentedImg1, segmentedImg2;
@@ -60,19 +66,18 @@ int main(int _argc, char** _argv){
 
         center /= ptCounter;
 
-        cv::Mat display = _img.clone();
-        cv::circle(display, center, 30, cv::Scalar(0,255,0),4);
-        cv::imshow("img", display);
-        cv::waitKey(3);
-
-        float z = 1.0; // 1 meter
+        float z = 3.0; // 1 meter
         float x = (center.x - cx)/fx*z;
         float y = (center.y - cy)/fy*z;
+
+        vx.push_back(x);
+        vy.push_back(y);
+        vz.push_back(z);
+
         return Eigen::Vector3f({x,y,z});
     };
     
     vcal::VisualControlScheme vcs(procImage);
-
     // Configure camera stream
     vcs.configureImageStream(   vcal::VisualControlScheme::eCamerasType::DATASET, 
                                 {{"color_images", _argv[1]}});
@@ -80,16 +85,11 @@ int main(int _argc, char** _argv){
 
     // Configure PID out with fastcom
     vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
-                            vcal::VisualControlScheme::eComTypes::FASTCOM,
+                            vcal::VisualControlScheme::eComTypes::ROS,
                             {
-                                {"output_topic":"8888"      },
-                                {"param_topic_out":"8889"   },
-                                {"param_topic_in":"8890"    },
-                                {"k":"0.8"                  },
-                                {"ki":"0.0001"              },
-                                {"kd":"0.3"                 },
-                                {"wind_up":"10"             },
-                                {"saturation":"1"           }
+                                {"output_topic",       "/topic_out"},
+                                {"param_topic_out",    "/topic_p_out"},
+                                {"param_topic_in",     "/topic_p_in"}
                             }
                         );
 
@@ -98,8 +98,20 @@ int main(int _argc, char** _argv){
         return -1;
     }
 
-    for(;;)
+    rgbd::Graph2d plot("plot");
+
+    int len = 200;
+    for(;;){
+        if(vx.size() > 2){
+            plot.clean();
+            plot.draw(std::vector<double>(vx.begin() + (vx.size() < len? 0: vx.size()-len ), vx.end() ),  255, 0,0,rgbd::Graph2d::eDrawType::Lines);
+            plot.draw(std::vector<double>(vy.begin() + (vy.size() < len? 0: vy.size()-len ), vy.end() ),  0, 255,0,rgbd::Graph2d::eDrawType::Lines);
+            plot.draw(std::vector<double>(vz.begin() + (vz.size() < len? 0: vz.size()-len ), vz.end() ),  0, 0,255,rgbd::Graph2d::eDrawType::Lines);
+            plot.show();
+            cv::waitKey(3);
+        }   
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
 
 }

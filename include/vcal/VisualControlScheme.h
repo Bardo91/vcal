@@ -50,11 +50,8 @@ namespace vcal{
         enum class eComTypes {ROS, FASTCOM, NONE};
         enum class eCamerasType {REALSENSE, KINECT, MONOCULAR, DATASET, NONE};
 
-        struct PIDParams{
-            float kp, ki, kd, sat, wind;
-        };
-
-
+        enum class ePID {X, Y, Z};
+        enum class ePIDParam {KP, KI, KD, SAT, WINDUP};
 
         /// Creates a visual control scheme that creates a 3D control reference. 
         /// \params _imageCallback: Any function that computes a 3D reference for the control system from an input rgb image
@@ -64,39 +61,35 @@ namespace vcal{
         /// \params _imageCallback: Any function that computes a 3D reference for the control system from an input rgb image and a depth image
         VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> &_imageCallback);
 
+        /// Set PID parameters
+        /// \params _pid: pid to be tuned: x, y, or z
+        /// \params _param: param to be tuned: 
+        /// \params _value: value
+        void paramsPID(ePID _pid, ePIDParam _param, float _value);
+
         /// Basic destructor. Stops the pipe and kill all threads.
         ~VisualControlScheme();
 
         /// Configure visual control scheme interfaces.
         /// \params _module: type of module to be configured (PID, visualization or input reference)
         /// \params _comType: communication channel (ROS or fastcom)
-        /// \params _names: specific configuration to be applied. It depends on the module to be configured
+        /// \params _params: specific configuration to be applied. It depends on the module to be configured
         ///
         /// ### PARAMETERS LIST
         /// *ROS INTERFACE:
         ///     * PID:
-        ///         * "output_topic":"cmd_vel"          Topic where to publish result of PID
-        ///         * "param_topic_out":"uav_1_pid"     Topic where the params are published in a list of floats
-        ///         * "param_topic_in":"uav_1_pid"      Topic where the params are subscribed in a list of floats
-        ///         * "k":"0.723"                       Initial proportional parameter for the PID
-        ///         * "ki":"0.0001"                     Initial integral parameter for the PID
-        ///         * "kd":"0.3"                        Initial derivative parameter for the PID
-        ///         * "wind_up":"10"                    Initial anti windup parameter for the PID
-        ///         * "saturation":"1"                  Initial saturation parameter for the PID
+        ///         * "output_topic":"cmd_vel"              Topic where to publish result of PID
+        ///         * "param_topic_out":"uav_1_pid_out"     Topic where the params are published in a list of floats. This will be used as base for each X Y Z pid
+        ///         * "param_topic_in":"uav_1_pid_in"       Topic where the params are subscribed in a list of floats. This will be used as base for each X Y Z pid
         ///     * VISUALIZATION:
         ///         * "stream_topic":"topic_name"       Optionally, enable streaming of image
         ///     * REFERENCE:
         ///         * "input_topic":"topic_name"        Mandatory, topic where to read the 3D reference for the PID
         /// *fastcom INTERFACE:
         ///     * PID:
-        ///         * "output_topic":"8888"         Port number where to publish result of PID
-        ///         * "param_topic_out":"8889"      Port number where the params are published in a list of floats
-        ///         * "param_topic_in":"8890"       Port number where the params are subscribed in a list of floats
-        ///         * "k":"0.723"                   Initial proportional parameter for the PID
-        ///         * "ki":"0.0001"                 Initial integral parameter for the PID
-        ///         * "kd":"0.3"                    Initial derivative parameter for the PID
-        ///         * "wind_up":"10"                Initial anti windup parameter for the PID
-        ///         * "saturation":"1"              Initial saturation parameter for the PID
+        ///         * "output_topic":"8888"                 Port numbers where to publish result of PID
+        ///         * "param_topic_out":"8889:8890::8891"   Port numbers where the params are published in a list of floats, one port per X, Y, Z
+        ///         * "param_topic_in":"8892:8893::8894"    Port numbers where the params are subscribed in a list of floats, one port per X, Y, Z
         ///     * VISUALIZATION:
         ///         * "stream_topic":"8891"         Optionally, enable port number where to stream the input image
         ///     * REFERENCE:
@@ -104,7 +97,7 @@ namespace vcal{
         ///
         bool configureInterface(    const eModules _module, 
                                     const eComTypes _comType, 
-                                    const std::unordered_map<std::string, std::string> &_names);
+                                    std::unordered_map<std::string, std::string> _params);
 
         /// Basic configure input stream for the visual control scheme.
         /// \param _cameraType: choose input device
@@ -124,7 +117,7 @@ namespace vcal{
         ///     * "depth_images":"template_path_to_files_%d.png"            Template filename where the images are located and stored sequentially.
         ///                                                                 This param applies for datasets with depth images.
         ///
-        bool configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> &_params);
+        bool configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> _params);
 
         /// Start/resume processing data
         bool startPipe();
@@ -136,14 +129,16 @@ namespace vcal{
         void initLogFile();
         void registerLog(const std::string & _tag, const std::string &_register);
 
-        bool checkCamera();
-        bool checkCameraKinect();
-        bool checkCameraRealsense();
-        bool checkCameraMonocular();
-        bool checkCameraDataset();
+        bool configureCamera();
+        bool configureCameraKinect();
+        bool configureCameraRealsense();
+        bool configureCameraMonocular();
+        bool configureCameraDataset();
 
-        bool checkInterfaces();
-
+        bool configureInterfacePID              (const eComTypes _comType, std::unordered_map<std::string, std::string> _params);
+        bool configureInterfaceVisualization    (const eComTypes _comType, std::unordered_map<std::string, std::string> _params);
+        bool configureInterfaceRefence          (const eComTypes _comType, std::unordered_map<std::string, std::string> _params);
+        
         void VisualControlLoop();
 
     private:
@@ -155,32 +150,25 @@ namespace vcal{
         std::function<Eigen::Vector3f(const cv::Mat &)> mCallbackMonocular;
         std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> mCallbackStereo;
 
-        eComTypes mSwitchPID    = eComTypes::NONE;
-        eComTypes mSwitchRef    = eComTypes::NONE;
-        eComTypes mSwitchStream = eComTypes::NONE;
-
         std::ofstream mLogFile;
 
         #ifdef HAS_ROS
-            ros::Subscriber             mRosSubPIDReference;
-            ros::Subscriber             mRosSubPIDParams;
-            ros::Publisher              mRosPubPIDParams;
+            ros::NodeHandle             mNH;
             ros::Publisher              mRosPubPIDOut;
             image_transport::Publisher  mRosPubImageStream;
         #endif
 
         #ifdef HAS_FASTCOM
-            fastcom::Subscriber<float>      *mFastComSubPIDReference;
-            fastcom::Subscriber<PIDParams>  *mFastComSubPIDParams;
-            fastcom::Publisher<PIDParams>   *mFastComPubPIDParams;
-            fastcom::Publisher<float>       *mFastComPubPIDOut;
-            fastcom::ImagePublisher         *mFastComPubImageStream;
+            fastcom::Publisher<float>       *mFastComPubPIDOut = nullptr;
+            fastcom::ImagePublisher         *mFastComPubImageStream = nullptr;
         #endif
 
         std::thread mLoopThread;
         bool mRun = false;
 
-        PID *mController;
+        PID *mControllerX;
+        PID *mControllerY;
+        PID *mControllerZ;
 
         // some ituls
         const std::string cTextRed		= "\033[31m";

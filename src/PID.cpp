@@ -17,11 +17,15 @@
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //---------------------------------------------------------------------------------------------------------------------
 
-#include "PID.h"
+#include <vcal/PID.h>
 #include <algorithm>
-#include <std_msgs/Float32.h>
 #include <thread>
 #include <chrono>
+
+#ifdef HAS_ROS
+    #include <ros/ros.h>
+    #include <std_msgs/Float32MultiArray.h>
+#endif
 
 PID::PID(float _kp, float _ki, float _kd, float _minSat, float _maxSat, float _minWind, float _maxWind) {
     mKp = _kp;
@@ -51,4 +55,80 @@ float PID::update(float _val, float _incT) {
     mBouncingFactor *= 2.0;
     mBouncingFactor = mBouncingFactor > 1.0 ? 1.0 : mBouncingFactor;
     return mLastResult;
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+void PID::enableRosPublisher(std::string _topic){
+    #ifdef HAS_ROS
+        mRosPubParams = mNH.advertise<std_msgs::Float32MultiArray>(_topic, 1);
+        mRun = false;
+        if(mParamPubThread.joinable())
+            mParamPubThread.join();
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        mRun = true;
+        mParamPubThread = std::thread([&](){
+            while(mRun){
+                std_msgs::Float32MultiArray data;
+                data.data = {mKp, mKi, mKd, mMaxSat, mWindupMax};
+                mRosPubParams.publish(data);
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+        });
+    #endif
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+void PID::enableRosSubscriber(std::string _topic){
+    #ifdef HAS_ROS
+        mRosSubParams = mNH.subscribe<std_msgs::Float32MultiArray>(_topic, 1, [this](const std_msgs::Float32MultiArray::ConstPtr &_msg){
+            mKp = _msg->data[0];
+            mKi = _msg->data[1];
+            mKd = _msg->data[2];
+            mMinSat = -_msg->data[3];
+            mMaxSat = _msg->data[3];
+            mWindupMin = -_msg->data[4];
+            mWindupMax = _msg->data[4];
+        });
+    #endif
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+void PID::enableFastcomPublisher(int _port){
+    #ifdef HAS_FASTCOM
+        if(mFastcomPubParams) delete mFastcomPubParams;
+        mFastcomPubParams = new fastcom::Publisher<PIDParams>(_port);
+        mRun = false;
+        if(mParamPubThread.joinable())
+            mParamPubThread.join();
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        mRun = true;
+        mParamPubThread = std::thread([&](){
+            while(mRun){
+                PIDParams params = {mKp, mKi, mKd, mMaxSat, mWindupMax};
+                mFastcomPubParams->publish(params);
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+        });
+    #endif
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+void PID::enableFastcomSubscriber(int _port){
+    #ifdef HAS_FASTCOM
+        if(mFastcomSubParams) delete mFastcomSubParams;
+        mFastcomSubParams  = new fastcom::Subscriber<PIDParams>("0.0.0.0", _port);
+        
+        auto callback = [this](const PIDParams &_params){
+                mKp = _params.kp;
+                mKi = _params.ki;
+                mKd = _params.kd;
+                mMinSat = -_params.sat;
+                mMaxSat =  _params.sat;
+                mWindupMin = -_params.wind;
+                mWindupMax =  _params.wind;
+            };
+        mFastcomSubParams->attachCallback(callback);
+    #endif
 }

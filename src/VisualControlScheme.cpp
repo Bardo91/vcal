@@ -24,21 +24,87 @@
 #include <chrono>
 #include <algorithm>
 
+#ifdef HAS_ROS
+    #include <std_msgs/Float32MultiArray.h>
+#endif
+
+std::vector<std::string> splitString(const std::string& s, char delimiter) {
+   std::vector<std::string> tokens;
+   std::string token;
+   std::istringstream tokenStream(s);
+   while (std::getline(tokenStream, token, delimiter)) {
+      tokens.push_back(token);
+   }
+   return tokens;
+}
+
+
 namespace vcal{
-        
         //-------------------------------------------------------------------------------------------------------------
         VisualControlScheme::VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &)> &_imageCallback){
                 initLogFile();
                 mCallbackMonocular = _imageCallback;
+                #ifdef HAS_ROS
+                        if(!ros::isInitialized()){
+                                std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
+                                assert(false);
+                        }
+                #endif
+                mControllerX = new PID(0,0,0);
+                mControllerY = new PID(0,0,0);
+                mControllerZ = new PID(0,0,0);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         VisualControlScheme::VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> &_imageCallback){
                 initLogFile();
                 mCallbackStereo = _imageCallback;
+                #ifdef HAS_ROS
+                        if(!ros::isInitialized()){
+                                std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
+                                assert(false);
+                        }
+                #endif
+                mControllerX = new PID(0,0,0);
+                mControllerY = new PID(0,0,0);
+                mControllerZ = new PID(0,0,0);
         } 
 
-        
+        //-------------------------------------------------------------------------------------------------------------
+        void VisualControlScheme::paramsPID(ePID _pid, ePIDParam _param, float _value){
+                PID *mController;
+                switch (_pid) {
+                        case ePID::X:
+                                mController = mControllerX;
+                                break;
+                        case ePID::Y:
+                                mController = mControllerY;
+                                break;
+                        case ePID::Z:
+                                mController = mControllerZ;
+                                break;
+                }
+
+                 switch (_param) {
+                        case ePIDParam::KP:
+                                mController->kp(_value);
+                                break;
+                        case ePIDParam::KI:
+                                mController->ki(_value);
+                                break;
+                        case ePIDParam::KD:
+                                mController->kd(_value);
+                                break;
+                        case ePIDParam::SAT:
+                                mController->setSaturations(-_value,_value);
+                                break;
+                        case ePIDParam::WINDUP:
+                                mController->setWindupTerms(-_value,_value);
+                                break;
+                }
+        }
+
+        //-------------------------------------------------------------------------------------------------------------
         VisualControlScheme::~VisualControlScheme(){
                 stopPipe();
         }
@@ -46,8 +112,21 @@ namespace vcal{
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterface(   const eModules _module, 
                                                         const eComTypes _comType, 
-                                                        const std::unordered_map<std::string, std::string> &_names){
+                                                        std::unordered_map<std::string, std::string> _params){
                 
+                switch (_module) {
+                        case eModules::PID:
+                                /* code */
+                                break;
+                        case eModules::REFERENCE:
+                                /* code */
+                                break;
+                        case eModules::VISUALIZATION:
+                                /* code */
+                                break;
+                        default:
+                                return false;
+                }
         
         }
 
@@ -57,21 +136,23 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> &_params){
+        bool VisualControlScheme::configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> _params){
                 mCameraType = _cameraType;
                 mCameraParams = _params;
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::startPipe(){
-                if(checkCamera() && checkInterfaces()){
+                if(configureCamera()){
                         registerLog("config", "Starting pipeline");
+                        std::cout << cTextGreen << "Starting pipeline" << cTextReset << std::endl;
                         mRun = true;
                         mLoopThread = std::thread(&VisualControlScheme::VisualControlLoop, this);
 
                         return true;       
                 }else{
                         registerLog("config", "Can't start pipeline");
+                        std::cout << cTextRed << "Can't start pipeline" << cTextReset << std::endl;
                         return false;
                 }
         }
@@ -109,7 +190,7 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCamera(){
+        bool VisualControlScheme::configureCamera(){
                 if(mCameraType == eCamerasType::NONE){
                         std::cout << cTextRed << "Error, camera type not configured" << cTextReset << std::endl;
                         registerLog("config", "Error, camera type not configured");
@@ -118,19 +199,19 @@ namespace vcal{
                         bool result = false;
                         switch(mCameraType){
                         case eCamerasType::KINECT:
-                                result = checkCameraKinect();
+                                result = configureCameraKinect();
                                 mHasDepth = true;
                                 break;
                         case eCamerasType::REALSENSE:
-                                result = checkCameraRealsense();
+                                result = configureCameraRealsense();
                                 mHasDepth = true;
                                 break;
                         case eCamerasType::MONOCULAR:
-                                result = checkCameraMonocular();
+                                result = configureCameraMonocular();
                                 mHasDepth = false;
                                 break;
                         case eCamerasType::DATASET:
-                                result = checkCameraDataset();
+                                result = configureCameraDataset();
                                 break;
                         }
 
@@ -147,14 +228,14 @@ namespace vcal{
         }
         
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCameraKinect(){
+        bool VisualControlScheme::configureCameraKinect(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Kinect);
                 cjson::Json config;
                 return mCamera && mCamera->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCameraRealsense(){
+        bool VisualControlScheme::configureCameraRealsense(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::RealSense);
                 cjson::Json config;
                 config["deviceId"] = 0;
@@ -169,7 +250,7 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCameraMonocular(){
+        bool VisualControlScheme::configureCameraMonocular(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Custom);
                 cjson::Json config;
                 config["device"]["type"] = "opencv";
@@ -186,10 +267,11 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCameraDataset(){
+        bool VisualControlScheme::configureCameraDataset(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
                 cjson::Json config;
                 config["input"]["pointCloud"]="";
+                config["loop_dataset"] = true;
 
                 if(mCameraParams.find("color_images")!= mCameraParams.end())
                         config["input"]["left"]= mCameraParams["color_images"];
@@ -223,15 +305,62 @@ namespace vcal{
                 return mCamera && mCamera->init(config);
         }
 
+        //-------------------------------------------------------------------------------------------------------------
+        bool VisualControlScheme::configureInterfacePID(const eComTypes _comType, std::unordered_map<std::string, std::string> _params){
+                if(_comType == eComTypes::ROS){
+                        if(_params.find("output_topic") != _params.end()){
+                                if(mFastComPubPIDOut) delete mFastComPubPIDOut;
+                                mFastComPubPIDOut = nullptr;
+                                mRosPubPIDOut = mNH.advertise<std_msgs::Float32MultiArray>(_params["output_topic"], 1);
+                        }
+                        if(_params.find("param_topic_out") != _params.end()){
+                                mControllerX->enableRosPublisher(_params["param_topic_out"]+"/X");
+                                mControllerY->enableRosPublisher(_params["param_topic_out"]+"/Y");
+                                mControllerZ->enableRosPublisher(_params["param_topic_out"]+"/Z");
+                        }
+                        if(_params.find("param_topic_in") != _params.end()){
+                                mControllerX->enableRosSubscriber(_params["param_topic_in"]+"/X");
+                                mControllerY->enableRosSubscriber(_params["param_topic_in"]+"/Y");
+                                mControllerZ->enableRosSubscriber(_params["param_topic_in"]+"/Z");
+                        }
+                }else if(_comType == eComTypes::FASTCOM){
+                        if(_params.find("output_topic") != _params.end()){
+                                if(mRosPubPIDOut) mRosPubPIDOut = ros::Publisher();
+                                mFastComPubPIDOut = new fastcom::Publisher<float>(atoi(_params["output_topic"].c_str()));
+                        }
+                        if(_params.find("param_topic_out") != _params.end()){
+                                auto ports = splitString(_params["param_topic_out"], ':');
+                                mControllerX->enableFastcomPublisher(atoi(ports[0].c_str()));
+                                mControllerY->enableFastcomPublisher(atoi(ports[1].c_str()));
+                                mControllerZ->enableFastcomPublisher(atoi(ports[2].c_str()));
+                        }
+                        if(_params.find("param_topic_in") != _params.end()){
+                                auto ports = splitString(_params["param_topic_out"], ':');
+                                mControllerX->enableFastcomSubscriber(atoi(ports[0].c_str()));
+                                mControllerY->enableFastcomSubscriber(atoi(ports[1].c_str()));
+                                mControllerZ->enableFastcomSubscriber(atoi(ports[2].c_str()));
+                        }
+                }else{
+                        return false;
+                }
+        }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkInterfaces(){
-                
+        bool VisualControlScheme::configureInterfaceVisualization(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
+
+        }
+
+        //-------------------------------------------------------------------------------------------------------------
+        bool VisualControlScheme::configureInterfaceRefence(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
+
         }
 
         //-------------------------------------------------------------------------------------------------------------
         void VisualControlScheme::VisualControlLoop(){
+                auto t0 = std::chrono::system_clock::now();
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 while(mRun){
+                        auto t1 = std::chrono::system_clock::now();
                         mCamera->grab();
                         cv::Mat leftImage, rightImage, depthImage;
                         mCamera->rgb(leftImage, rightImage);
@@ -245,6 +374,11 @@ namespace vcal{
                         }
 
                         std::cout << estimate.transpose() <<std::endl;
+                        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count()/1000.0;
+                        float uX = mControllerX->update(0,diff);
+                        float uY = mControllerY->update(0,diff);
+                        float uZ = mControllerZ->update(0,diff);
+                        t0 = t1;
                 }
         }
 
