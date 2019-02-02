@@ -45,15 +45,15 @@ find_package(OpenCV 3 REQUIRED core highgui imgproc imgcodecs features2d xfeatur
 set_target_properties(${OpenCV_LIBS} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
 
 #########################################
-# vcal
-find_package(vcal REQUIRED)
+# rgbd_tools
+find_package(rgbd_tools REQUIRED)
 
 #########################################
 # fastcom
 find_package(fastcom)
 if(${fastcom_FOUND})
 	list(APPEND VCAL_DEFINITIONS "HAS_FASTCOM")
-if(${fastcom_FOUND})
+endif(${fastcom_FOUND})
 
 #########################################
 # catkin
@@ -81,7 +81,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${VCAL_DEFINITIONS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC vcal::vcal)
+target_link_libraries(${PROJECT_NAME} PUBLIC rgbd_tools::rgbd_tools)
 
 if(${fastcom_FOUND})
 	target_link_libraries(${PROJECT_NAME} PUBLIC fastcom::fastcom)

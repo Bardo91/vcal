@@ -43,9 +43,16 @@
 namespace vcal{
     class VisualControlScheme{
     public:
-        enum eModules {PID, VISUALIZATION, REFERENCE};
-        enum eComTypes {ROS, FASTCOM, NONE};
-        enum eCamerasType {REALSENSE, KINECT, MONOCULAR, DATASET, NONE};
+        /// Public types
+        enum class eModules {PID, VISUALIZATION, REFERENCE};
+        enum class eComTypes {ROS, FASTCOM, NONE};
+        enum class eCamerasType {REALSENSE, KINECT, MONOCULAR, DATASET, NONE};
+
+        struct PIDParams{
+            float kp, ki, kd, sat, wind;
+        };
+
+
 
         /// Creates a visual control scheme that creates a 3D control reference. 
         /// \params _imageCallback: Any function that computes a 3D reference for the control system from an input rgb image
@@ -115,7 +122,7 @@ namespace vcal{
         ///     * "depth_images":"template_path_to_files_%d.png"            Template filename where the images are located and stored sequentially.
         ///                                                                 This param applies for datasets with depth images.
         ///
-        bool configureImageStream(const eCamerasType _cameraType, std::unordered_map<std::string, std::string> &_params);
+        bool configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> &_params);
 
         /// Start/resume processing data
         bool startPipe();
@@ -125,7 +132,7 @@ namespace vcal{
 
     private:
         void initLogFile();
-        void registerLog(std::string &_register);
+        void registerLog(const std::string & _tag, const std::string &_register);
 
         bool checkCamera();
         bool checkCameraKinect();
@@ -133,7 +140,7 @@ namespace vcal{
         bool checkCameraMonocular();
         bool checkCameraDataset();
 
-        bool ckeckCom();
+        bool checkCom();
 
         void VisualControlLoop();
 
@@ -161,23 +168,23 @@ namespace vcal{
         #endif
 
         #ifdef HAS_FASTCOM
-            fastcom::Subscriber     mFastComSubPIDReference;
-            fastcom::Subscriber     mFastComSubPIDParams;
-            fastcom::Publisher      mFastComPubPIDParams;
-            fastcom::Publisher      mFastComPubPIDOut;
-            fastcom::ImagePublisher mFastComPubImageStream;
+            fastcom::Subscriber<float>      *mFastComSubPIDReference;
+            fastcom::Subscriber<PIDParams>  *mFastComSubPIDParams;
+            fastcom::Publisher<PIDParams>   *mFastComPubPIDParams;
+            fastcom::Publisher<float>       *mFastComPubPIDOut;
+            fastcom::ImagePublisher         *mFastComPubImageStream;
         #endif
 
         std::thread mLoopThread;
         bool mRun = false;
 
         // some ituls
-        const std::string::cTextRed		= "\033[31m";
-        const std::string::cTextYellow	= "\033[33m";
-        const std::string::cTextBlue	= "\033[34m";
-        const std::string::cTextGreen	= "\033[32m";
-        const std::string::cTextReset	= "\033[0m";
-    }    
+        const std::string cTextRed		= "\033[31m";
+        const std::string cTextYellow	= "\033[33m";
+        const std::string cTextBlue	    = "\033[34m";
+        const std::string cTextGreen	= "\033[32m";
+        const std::string cTextReset	= "\033[0m";
+    };
 }
 
 

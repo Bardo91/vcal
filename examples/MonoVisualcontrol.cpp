@@ -18,3 +18,19 @@
 //  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //---------------------------------------------------------------------------------------------------------------------
+
+#include <iostream>
+#include <VisualControlScheme.h>
+
+
+int main(int _argc, char** _argv){
+
+    if(_argc !=2 ){
+        std::cout << "Bad Input arguments, provide path to image files template with something red to track" << std::endl;
+        return -1; 
+    }
+
+    
+
+
+}

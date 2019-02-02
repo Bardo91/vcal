@@ -19,7 +19,7 @@
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //---------------------------------------------------------------------------------------------------------------------
 
-#include <VisualControlScheme.h>
+#include <vcal/VisualControlScheme.h>
 
 #include <chrono>
 #include <algorithm>
@@ -52,21 +52,21 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::configureImageStream(const eCamerasType _cameraType, std::unordered_map<std::string, std::string> &_params){
+        bool VisualControlScheme::configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> &_params){
                 mCameraType = _cameraType;
                 mCameraParams = _params;
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::startPipe(){
-                if(checkCamera && checkCom()){
-                        register("config", "Starting pipeline")
+                if(checkCamera() && checkCom()){
+                        registerLog("config", "Starting pipeline");
                         mRun = true;
                         mLoopThread = std::thread(&VisualControlScheme::VisualControlLoop, this);
 
                         return true;       
                 }else{
-                        register("config", "Can't start pipeline")
+                        registerLog("config", "Can't start pipeline");
                         return false;
                 }
         }
@@ -81,17 +81,25 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::initLogFile(){
-                auto timeNow = std::chrono::system_clock::now();
-                std::string timeStr = std::put_time(std::localtime(&timeNow), "%H").str();
-                mLogFile.open(timeStr+"_vcal_log.txt");
+        void VisualControlScheme::initLogFile(){
+                using std::chrono::system_clock;
+                std::time_t tt = system_clock::to_time_t (system_clock::now());
+                struct std::tm * ptm = std::localtime(&tt);
+                auto timeFormat = std::put_time(ptm,"%H");
+                std::stringstream timeStr;
+                timeStr << timeFormat;
+                mLogFile.open(timeStr.str()+"_vcal_log.txt");
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        void VisualControlScheme::registerLog(std::string &_tag, std::string &_register){
-                auto timeNow = std::chrono::system_clock::now();
-                std::string timeStr = std::put_time(std::localtime(&timeNow), "%H").str();
-                std::string fullRegister = "["+ timeStr + "] ["+ _tag + "]\t"+_register+"\n";
+        void VisualControlScheme::registerLog(const std::string &_tag, const  std::string &_register){
+                using std::chrono::system_clock;
+                std::time_t tt = system_clock::to_time_t (system_clock::now());
+                struct std::tm * ptm = std::localtime(&tt);
+                auto timeFormat = std::put_time(ptm,"%H");
+                std::stringstream timeStr;
+                timeStr << timeFormat;
+                std::string fullRegister = "["+ timeStr.str() + "] ["+ _tag + "]\t"+_register+"\n";
                 mLogFile << fullRegister;
         }
 
@@ -134,14 +142,14 @@ namespace vcal{
         }
         
         //-------------------------------------------------------------------------------------------------------------
-        bool checkCameraKinect(){
+        bool VisualControlScheme::checkCameraKinect(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Kinect);
                 cjson::Json config;
                 return mCamera && mCamera->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool checkCameraRealsense(){
+        bool VisualControlScheme::checkCameraRealsense(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::RealSense);
                 cjson::Json config;
                 config["deviceId"] = 0;
@@ -156,7 +164,7 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool checkCameraMonocular(){
+        bool VisualControlScheme::checkCameraMonocular(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Custom);
                 cjson::Json config;
                 config["device"]["type"] = "opencv";
@@ -173,23 +181,28 @@ namespace vcal{
         }
 
         //-------------------------------------------------------------------------------------------------------------
-        bool checkCameraDataset(){
+        bool VisualControlScheme::checkCameraDataset(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
                 cjson::Json config;
-                if(mCameraParams.contains("color_images"))
+                if(mCameraParams.find("color_images")!= mCameraParams.end())
                         config["input"]["left"]= mCameraParams["color_images"];
                 else
                         return false;    
                 
-                if(mCameraParams.contains("color_images_second"))
+                if(mCameraParams.find("color_images_second") != mCameraParams.end())
                         config["input"]["right"]= mCameraParams["color_images_second"];
                 
-                if(mCameraParams.contains("depth_images"))
+                if(mCameraParams.find("depth_images")!= mCameraParams.end())
                         config["input"]["depth"]= mCameraParams["depth_images"];
 
-                mHasDepth = mCameraParams.contains("depth_images") || mCameraParams.contains("color_images_second");
+                mHasDepth =     (mCameraParams.find("depth_images")!= mCameraParams.end()) || 
+                                (mCameraParams.find("color_images_second") != mCameraParams.end());
 
-                if(mCallbackStereo && (!mCameraParams.contains("color_images_second") || !mCameraParams.contains("depth_images"))){
+                if(     mCallbackStereo && 
+                        (       
+                                !(mCameraParams.find("color_images_second")!= mCameraParams.end()) || 
+                                !(mCameraParams.find("depth_images")!= mCameraParams.end())
+                        ) ){
                         std::cout << cTextRed << "Can't use stereo callback with dataset without stereo or depth images" << cTextReset << std::endl;
                         registerLog("config", "Can't use stereo callback with dataset without stereo or depth images");
                         return false;
@@ -200,7 +213,7 @@ namespace vcal{
 
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::ckeckCom(){
+        bool VisualControlScheme::checkCom(){
 
         }
 
