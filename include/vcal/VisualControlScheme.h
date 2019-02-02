@@ -40,6 +40,8 @@
     #include <fastcom/fastcom.h>
 #endif
 
+#include <vcal/PID.h>
+
 namespace vcal{
     class VisualControlScheme{
     public:
@@ -140,7 +142,7 @@ namespace vcal{
         bool checkCameraMonocular();
         bool checkCameraDataset();
 
-        bool checkCom();
+        bool checkInterfaces();
 
         void VisualControlLoop();
 
@@ -177,6 +179,8 @@ namespace vcal{
 
         std::thread mLoopThread;
         bool mRun = false;
+
+        PID *mController;
 
         // some ituls
         const std::string cTextRed		= "\033[31m";

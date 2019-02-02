@@ -38,6 +38,11 @@ namespace vcal{
                 mCallbackStereo = _imageCallback;
         } 
 
+        
+        VisualControlScheme::~VisualControlScheme(){
+                stopPipe();
+        }
+
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterface(   const eModules _module, 
                                                         const eComTypes _comType, 
@@ -59,7 +64,7 @@ namespace vcal{
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::startPipe(){
-                if(checkCamera() && checkCom()){
+                if(checkCamera() && checkInterfaces()){
                         registerLog("config", "Starting pipeline");
                         mRun = true;
                         mLoopThread = std::thread(&VisualControlScheme::VisualControlLoop, this);
@@ -184,6 +189,8 @@ namespace vcal{
         bool VisualControlScheme::checkCameraDataset(){
                 mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
                 cjson::Json config;
+                config["input"]["pointCloud"]="";
+
                 if(mCameraParams.find("color_images")!= mCameraParams.end())
                         config["input"]["left"]= mCameraParams["color_images"];
                 else
@@ -191,9 +198,14 @@ namespace vcal{
                 
                 if(mCameraParams.find("color_images_second") != mCameraParams.end())
                         config["input"]["right"]= mCameraParams["color_images_second"];
+                else
+                        config["input"]["right"]="";
                 
                 if(mCameraParams.find("depth_images")!= mCameraParams.end())
                         config["input"]["depth"]= mCameraParams["depth_images"];
+                else
+                        config["input"]["depth"]="";
+
 
                 mHasDepth =     (mCameraParams.find("depth_images")!= mCameraParams.end()) || 
                                 (mCameraParams.find("color_images_second") != mCameraParams.end());
@@ -213,8 +225,8 @@ namespace vcal{
 
 
         //-------------------------------------------------------------------------------------------------------------
-        bool VisualControlScheme::checkCom(){
-
+        bool VisualControlScheme::checkInterfaces(){
+                
         }
 
         //-------------------------------------------------------------------------------------------------------------
@@ -223,13 +235,16 @@ namespace vcal{
                         mCamera->grab();
                         cv::Mat leftImage, rightImage, depthImage;
                         mCamera->rgb(leftImage, rightImage);
-
+                        
+                        Eigen::Vector3f estimate;
                         if(mHasDepth){ // 666 assuming RGBD camera not stereo
                                 mCamera->depth(depthImage);
-                                mCallbackStereo(leftImage, depthImage);
+                                estimate = mCallbackStereo(leftImage, depthImage);
                         }else{
-                                mCallbackMonocular(leftImage);
+                                estimate = mCallbackMonocular(leftImage);
                         }
+
+                        std::cout << estimate.transpose() <<std::endl;
                 }
         }
 

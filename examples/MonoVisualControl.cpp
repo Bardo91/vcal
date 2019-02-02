@@ -30,7 +30,76 @@ int main(int _argc, char** _argv){
         return -1; 
     }
 
+    // Create Visual control with mono loop
+    float cx = 320;
+    float cy = 240;
+    float fx = 510;
+    float fy = 510;
+
+    std::function<Eigen::Vector3f(const cv::Mat&)> procImage = [&](const cv::Mat &_img) -> Eigen::Vector3f{
+        cv::Mat hsv_image;
+        cv::cvtColor(_img, hsv_image, cv::COLOR_BGR2HSV);
+
+        cv::Mat segmentedImg1, segmentedImg2;
+        cv::inRange(hsv_image, cv::Scalar(0, 100, 100), cv::Scalar(20, 255, 255), segmentedImg1);
+        cv::inRange(hsv_image, cv::Scalar(160, 100, 100), cv::Scalar(179, 255, 255), segmentedImg2);
+
+        cv::Mat red_hue_image;
+        cv::addWeighted(segmentedImg1, 1.0, segmentedImg2, 1.0, 0.0, red_hue_image);
+
+        int ptCounter = 0;
+        cv::Point2f center(0,0);
+        for(unsigned i = 0;  i < red_hue_image.rows; i++){
+            for(unsigned j = 0;  j < red_hue_image.cols; j++){
+                if(red_hue_image.at<uchar>(i,j) > 200){
+                    center += cv::Point2f(j,i);
+                    ptCounter++;
+                }
+            }
+        }
+
+        center /= ptCounter;
+
+        cv::Mat display = _img.clone();
+        cv::circle(display, center, 30, cv::Scalar(0,255,0),4);
+        cv::imshow("img", display);
+        cv::waitKey(3);
+
+        float z = 1.0; // 1 meter
+        float x = (center.x - cx)/fx*z;
+        float y = (center.y - cy)/fy*z;
+        return Eigen::Vector3f({x,y,z});
+    };
     
+    vcal::VisualControlScheme vcs(procImage);
+
+    // Configure camera stream
+    vcs.configureImageStream(   vcal::VisualControlScheme::eCamerasType::DATASET, 
+                                {{"color_images", _argv[1]}});
+    
+
+    // Configure PID out with fastcom
+    vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
+                            vcal::VisualControlScheme::eComTypes::FASTCOM,
+                            {
+                                {"output_topic":"8888"      },
+                                {"param_topic_out":"8889"   },
+                                {"param_topic_in":"8890"    },
+                                {"k":"0.8"                  },
+                                {"ki":"0.0001"              },
+                                {"kd":"0.3"                 },
+                                {"wind_up":"10"             },
+                                {"saturation":"1"           }
+                            }
+                        );
+
+    if(!vcs.startPipe()){
+        std::cout << "Error"<<std::endl;
+        return -1;
+    }
+
+    for(;;)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 
 }
