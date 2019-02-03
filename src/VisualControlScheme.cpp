@@ -116,13 +116,13 @@ namespace vcal{
                 
                 switch (_module) {
                         case eModules::PID:
-                                /* code */
+                                return configureInterfacePID(_comType, _params);
                                 break;
                         case eModules::REFERENCE:
-                                /* code */
+                                return configureInterfaceRefence(_comType, _params);
                                 break;
                         case eModules::VISUALIZATION:
-                                /* code */
+                                return configureInterfaceVisualization(_comType, _params);
                                 break;
                         default:
                                 return false;
@@ -171,7 +171,7 @@ namespace vcal{
                 using std::chrono::system_clock;
                 std::time_t tt = system_clock::to_time_t (system_clock::now());
                 struct std::tm * ptm = std::localtime(&tt);
-                auto timeFormat = std::put_time(ptm,"%H");
+                auto timeFormat = std::put_time(ptm,"%H-%M-%S");
                 std::stringstream timeStr;
                 timeStr << timeFormat;
                 mLogFile.open(timeStr.str()+"_vcal_log.txt");
@@ -182,7 +182,7 @@ namespace vcal{
                 using std::chrono::system_clock;
                 std::time_t tt = system_clock::to_time_t (system_clock::now());
                 struct std::tm * ptm = std::localtime(&tt);
-                auto timeFormat = std::put_time(ptm,"%H");
+                auto timeFormat = std::put_time(ptm,"%H-%M-%S");
                 std::stringstream timeStr;
                 timeStr << timeFormat;
                 std::string fullRegister = "["+ timeStr.str() + "] ["+ _tag + "]\t"+_register+"\n";
@@ -326,7 +326,7 @@ namespace vcal{
                 }else if(_comType == eComTypes::FASTCOM){
                         if(_params.find("output_topic") != _params.end()){
                                 if(mRosPubPIDOut) mRosPubPIDOut = ros::Publisher();
-                                mFastComPubPIDOut = new fastcom::Publisher<float>(atoi(_params["output_topic"].c_str()));
+                                mFastComPubPIDOut = new fastcom::Publisher<ControlSignal>(atoi(_params["output_topic"].c_str()));
                         }
                         if(_params.find("param_topic_out") != _params.end()){
                                 auto ports = splitString(_params["param_topic_out"], ':');
@@ -343,16 +343,72 @@ namespace vcal{
                 }else{
                         return false;
                 }
+                return true;
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterfaceVisualization(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
-
+                if(_comType == eComTypes::ROS){
+                        if(_params.find("stream_topic") != _params.end()){
+                                if(mFastComPubImageStream) delete mFastComPubImageStream;
+                                mFastComPubPIDOut = nullptr;
+                                image_transport::ImageTransport it(mNH);
+                                mRosPubImageStream = it.advertise(_params["stream_topic"], 1);
+                        }
+                }else if(_comType == eComTypes::FASTCOM){
+                        if(_params.find("stream_topic") != _params.end()){
+                                if(mRosPubImageStream) mRosPubImageStream = image_transport::Publisher();
+                                mFastComPubImageStream = new fastcom::ImagePublisher(atoi(_params["stream_topic"].c_str()));
+                        }
+                }else{
+                        return false;
+                }
+                return true;
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterfaceRefence(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
-
+                if(_comType == eComTypes::ROS){
+                        if(_params.find("input_topic") != _params.end()){
+                                if(mFastcomSubPIDRef) delete mFastcomSubPIDRef;
+                                mFastcomSubPIDRef = nullptr;
+                                mRosSubPIDRef = mNH.subscribe<std_msgs::Float32MultiArray>(_params["input_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
+                                        if(fabs(mControllerX->reference() - _msg->data[0])> 0.05){
+                                                mControllerX->reference(_msg->data[0]);
+                                        }
+                                        if(fabs(mControllerY->reference() - _msg->data[1])> 0.05){
+                                                mControllerY->reference(_msg->data[1]);
+                                        }
+                                        if(fabs(mControllerZ->reference() - _msg->data[2])> 0.05){
+                                                mControllerZ->reference(_msg->data[2]);
+                                        }
+                                });
+                        }else{
+                                return false;
+                        }
+                }else if(_comType == eComTypes::FASTCOM){
+                        if(_params.find("input_topic") != _params.end()){
+                                if(mRosSubPIDRef) mRosSubPIDRef = ros::Subscriber();
+                                mFastcomSubPIDRef = new fastcom::Subscriber<ControlSignal>(atoi(_params["input_topic"].c_str()));
+                                mFastcomSubPIDRef->attachCallback([&](const ControlSignal &_reference){
+                                        if(fabs(mControllerX->reference() - _reference.ux)> 0.05){
+                                                mControllerX->reference(_reference.ux);
+                                        }
+                                        if(fabs(mControllerY->reference() - _reference.uy)> 0.05){
+                                                mControllerY->reference(_reference.uy);
+                                        }
+                                        if(fabs(mControllerZ->reference() - _reference.uz)> 0.05){
+                                                mControllerZ->reference(_reference.uz);
+                                        }
+                                });
+                        }else {
+                                return false;
+                        }
+                        
+                }else{
+                        return false;
+                }
+                return true;
         }
 
         //-------------------------------------------------------------------------------------------------------------
@@ -373,12 +429,32 @@ namespace vcal{
                                 estimate = mCallbackMonocular(leftImage);
                         }
 
-                        std::cout << estimate.transpose() <<std::endl;
+                        //std::cout << estimate.transpose() <<std::endl;
                         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count()/1000.0;
-                        float uX = mControllerX->update(0,diff);
-                        float uY = mControllerY->update(0,diff);
-                        float uZ = mControllerZ->update(0,diff);
                         t0 = t1;
+                        float uX = mControllerX->update(estimate[0],diff);
+                        float uY = mControllerY->update(estimate[1],diff);
+                        float uZ = mControllerZ->update(estimate[2],diff);
+                        #ifdef HAS_FASTCOM
+                        if(mFastComPubPIDOut){
+                                ControlSignal signal = {uX, uY, uZ};
+                                mFastComPubPIDOut->publish(signal);
+                        }
+                        if(mFastComPubImageStream){
+                                mFastComPubImageStream->publish(leftImage);
+                        }
+                        #endif
+                        #ifdef HAS_ROS
+                        if(mRosPubPIDOut){
+                                std_msgs::Float32MultiArray msg;
+                                msg.data = {uX, uY, uZ};
+                                mRosPubPIDOut.publish(msg);
+                        }
+                        if(mRosPubImageStream){
+                                sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", leftImage).toImageMsg();
+                                mRosPubImageStream.publish(msg);
+                        }
+                        #endif
                 }
         }
 

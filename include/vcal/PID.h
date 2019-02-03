@@ -23,6 +23,7 @@
 
 #ifdef HAS_ROS
     #include <ros/ros.h>
+    #include <std_msgs/Float32MultiArray.h>
 #endif
 #ifdef HAS_FASTCOM
     #include <fastcom/fastcom.h>
@@ -64,6 +65,11 @@ public:
     void setWindupTerms(float _min, float _max) { mWindupMin = _min; mWindupMax = _max; }
     void getWindupTerms(float _min, float _max) { _min = mWindupMin; _max = mWindupMax; }
  
+private:
+    #ifdef HAS_ROS
+    void rosSubCallback(const std_msgs::Float32MultiArray::ConstPtr &_msg);
+    #endif
+
 private:
     float mReference;
     float mKp, mKi, mKd;

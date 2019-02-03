@@ -57,10 +57,10 @@ endif(${fastcom_FOUND})
 
 #########################################
 # catkin
-find_package(catkin REQUIRED roscpp rosbag cv_bridge image_transport sensor_msgs)
+find_package(catkin REQUIRED roscpp cv_bridge image_transport sensor_msgs)
 if(${catkin_FOUND})
 	catkin_package(
-		CATKIN_DEPENDS roscpp rosbag cv_bridge image_transport sensor_msgs
+		CATKIN_DEPENDS roscpp cv_bridge image_transport sensor_msgs
 		INCLUDE_DIRS include
 	)
 	list(APPEND VCAL_DEFINITIONS "HAS_ROS")

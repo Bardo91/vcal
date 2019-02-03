@@ -81,15 +81,7 @@ void PID::enableRosPublisher(std::string _topic){
 //------------------------------------------------------------------------------------------------------------------------------
 void PID::enableRosSubscriber(std::string _topic){
     #ifdef HAS_ROS
-        mRosSubParams = mNH.subscribe<std_msgs::Float32MultiArray>(_topic, 1, [this](const std_msgs::Float32MultiArray::ConstPtr &_msg){
-            mKp = _msg->data[0];
-            mKi = _msg->data[1];
-            mKd = _msg->data[2];
-            mMinSat = -_msg->data[3];
-            mMaxSat = _msg->data[3];
-            mWindupMin = -_msg->data[4];
-            mWindupMax = _msg->data[4];
-        });
+        mRosSubParams = mNH.subscribe<std_msgs::Float32MultiArray>(_topic, 1, &PID::rosSubCallback, this);
     #endif
 }
 
@@ -132,3 +124,17 @@ void PID::enableFastcomSubscriber(int _port){
         mFastcomSubParams->attachCallback(callback);
     #endif
 }
+
+
+#ifdef HAS_ROS
+void PID::rosSubCallback(const std_msgs::Float32MultiArray::ConstPtr &_msg){
+    std::cout << "Received message" << std::endl;
+    this->mKp = _msg->data[0];
+    this->mKi = _msg->data[1];
+    this->mKd = _msg->data[2];
+    this->mMinSat = -_msg->data[3];
+    this->mMaxSat = _msg->data[3];
+    this->mWindupMin = -_msg->data[4];
+    this->mWindupMax = _msg->data[4];
+}
+#endif

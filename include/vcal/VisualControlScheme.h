@@ -53,6 +53,10 @@ namespace vcal{
         enum class ePID {X, Y, Z};
         enum class ePIDParam {KP, KI, KD, SAT, WINDUP};
 
+        struct ControlSignal{
+            float ux, uy, uz;
+        };
+
         /// Creates a visual control scheme that creates a 3D control reference. 
         /// \params _imageCallback: Any function that computes a 3D reference for the control system from an input rgb image
         VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &)> &_imageCallback);
@@ -155,12 +159,15 @@ namespace vcal{
         #ifdef HAS_ROS
             ros::NodeHandle             mNH;
             ros::Publisher              mRosPubPIDOut;
+            ros::Subscriber             mRosSubPIDRef;
             image_transport::Publisher  mRosPubImageStream;
         #endif
 
         #ifdef HAS_FASTCOM
-            fastcom::Publisher<float>       *mFastComPubPIDOut = nullptr;
-            fastcom::ImagePublisher         *mFastComPubImageStream = nullptr;
+            fastcom::Publisher<ControlSignal>       *mFastComPubPIDOut = nullptr;
+            fastcom::Subscriber<ControlSignal>      *mFastcomSubPIDRef = nullptr;
+            fastcom::ImagePublisher                 *mFastComPubImageStream = nullptr;
+
         #endif
 
         std::thread mLoopThread;

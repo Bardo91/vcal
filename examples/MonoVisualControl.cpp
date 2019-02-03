@@ -22,6 +22,7 @@
 #include <iostream>
 #include <vcal/VisualControlScheme.h>
 #include <rgbd_tools/utils/Graph2d.h>
+#include <std_msgs/Float32.h>
 
 int main(int _argc, char** _argv){
     ros::init(_argc, _argv, "MonoVisualControl");
@@ -87,11 +88,20 @@ int main(int _argc, char** _argv){
     vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
                             vcal::VisualControlScheme::eComTypes::ROS,
                             {
-                                {"output_topic",       "/topic_out"},
-                                {"param_topic_out",    "/topic_p_out"},
-                                {"param_topic_in",     "/topic_p_in"}
+                                {"output_topic",       "/pid_out"},
+                                {"param_topic_out",    "/pid_params_out"},
+                                {"param_topic_in",     "/pid_params_in"}
                             }
                         );
+    
+    vcs.configureInterface( vcal::VisualControlScheme::eModules::REFERENCE,
+                            vcal::VisualControlScheme::eComTypes::ROS,
+                            {{"input_topic", "/control_reference"}});
+
+
+    vcs.configureInterface( vcal::VisualControlScheme::eModules::VISUALIZATION,
+                            vcal::VisualControlScheme::eComTypes::ROS,
+                            {{"stream_topic","/vcal_visualization"}});
 
     if(!vcs.startPipe()){
         std::cout << "Error"<<std::endl;
@@ -100,8 +110,13 @@ int main(int _argc, char** _argv){
 
     rgbd::Graph2d plot("plot");
 
+    #ifdef HAS_ROS
+        ros::AsyncSpinner spinner(4);
+        spinner.start();
+    #endif
+
     int len = 200;
-    for(;;){
+    while(ros::ok()){
         if(vx.size() > 2){
             plot.clean();
             plot.draw(std::vector<double>(vx.begin() + (vx.size() < len? 0: vx.size()-len ), vx.end() ),  255, 0,0,rgbd::Graph2d::eDrawType::Lines);
