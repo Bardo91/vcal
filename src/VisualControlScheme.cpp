@@ -335,7 +335,7 @@ namespace vcal{
                                 mControllerZ->enableFastcomPublisher(atoi(ports[2].c_str()));
                         }
                         if(_params.find("param_topic_in") != _params.end()){
-                                auto ports = splitString(_params["param_topic_out"], ':');
+                                auto ports = splitString(_params["param_topic_in"], ':');
                                 mControllerX->enableFastcomSubscriber(atoi(ports[0].c_str()));
                                 mControllerY->enableFastcomSubscriber(atoi(ports[1].c_str()));
                                 mControllerZ->enableFastcomSubscriber(atoi(ports[2].c_str()));
@@ -369,10 +369,10 @@ namespace vcal{
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterfaceRefence(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
                 if(_comType == eComTypes::ROS){
-                        if(_params.find("input_topic") != _params.end()){
+                        if(_params.find("reference_topic") != _params.end()){
                                 if(mFastcomSubPIDRef) delete mFastcomSubPIDRef;
                                 mFastcomSubPIDRef = nullptr;
-                                mRosSubPIDRef = mNH.subscribe<std_msgs::Float32MultiArray>(_params["input_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
+                                mRosSubPIDRef = mNH.subscribe<std_msgs::Float32MultiArray>(_params["reference_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
                                         if(fabs(mControllerX->reference() - _msg->data[0])> 0.05){
                                                 mControllerX->reference(_msg->data[0]);
                                         }
@@ -383,13 +383,17 @@ namespace vcal{
                                                 mControllerZ->reference(_msg->data[2]);
                                         }
                                 });
+                        }if(_params.find("estimation_topic") != _params.end()){
+                                if(mFastComPubEstimation) delete mFastComPubEstimation;
+                                mFastComPubEstimation = nullptr;
+                                mRosPubEstimation = mNH.advertise<std_msgs::Float32MultiArray>(_params["estimation_topic"], 1);
                         }else{
                                 return false;
                         }
                 }else if(_comType == eComTypes::FASTCOM){
-                        if(_params.find("input_topic") != _params.end()){
+                        if(_params.find("reference_topic") != _params.end()){
                                 if(mRosSubPIDRef) mRosSubPIDRef = ros::Subscriber();
-                                mFastcomSubPIDRef = new fastcom::Subscriber<ControlSignal>(atoi(_params["input_topic"].c_str()));
+                                mFastcomSubPIDRef = new fastcom::Subscriber<ControlSignal>(atoi(_params["reference_topic"].c_str()));
                                 mFastcomSubPIDRef->attachCallback([&](const ControlSignal &_reference){
                                         if(fabs(mControllerX->reference() - _reference.ux)> 0.05){
                                                 mControllerX->reference(_reference.ux);
@@ -401,6 +405,9 @@ namespace vcal{
                                                 mControllerZ->reference(_reference.uz);
                                         }
                                 });
+                        }if(_params.find("estimation_topic") != _params.end()){
+                                if(mRosPubEstimation) mRosPubEstimation = ros::Publisher();
+                                mFastComPubEstimation = new fastcom::Publisher<ControlSignal>(atoi(_params["estimation_topic"].c_str()));
                         }else {
                                 return false;
                         }
@@ -436,24 +443,33 @@ namespace vcal{
                         float uY = mControllerY->update(estimate[1],diff);
                         float uZ = mControllerZ->update(estimate[2],diff);
                         #ifdef HAS_FASTCOM
-                        if(mFastComPubPIDOut){
-                                ControlSignal signal = {uX, uY, uZ};
-                                mFastComPubPIDOut->publish(signal);
-                        }
-                        if(mFastComPubImageStream){
-                                mFastComPubImageStream->publish(leftImage);
-                        }
+                                if(mFastComPubPIDOut){
+                                        ControlSignal signal = {uX, uY, uZ};
+                                        mFastComPubPIDOut->publish(signal);
+                                }
+                                if(mFastComPubImageStream){
+                                        mFastComPubImageStream->publish(leftImage);
+                                }
+                                if(mFastComPubEstimation) {
+                                        ControlSignal estimation = {estimate[0], estimate[1], estimate[2]};
+                                        mFastComPubEstimation->publish(estimation);
+                                }
                         #endif
                         #ifdef HAS_ROS
-                        if(mRosPubPIDOut){
-                                std_msgs::Float32MultiArray msg;
-                                msg.data = {uX, uY, uZ};
-                                mRosPubPIDOut.publish(msg);
-                        }
-                        if(mRosPubImageStream){
-                                sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", leftImage).toImageMsg();
-                                mRosPubImageStream.publish(msg);
-                        }
+                                if(mRosPubPIDOut){
+                                        std_msgs::Float32MultiArray msg;
+                                        msg.data = {uX, uY, uZ};
+                                        mRosPubPIDOut.publish(msg);
+                                }
+                                if(mRosPubImageStream){
+                                        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", leftImage).toImageMsg();
+                                        mRosPubImageStream.publish(msg);
+                                }
+                                if(mRosPubEstimation){
+                                        std_msgs::Float32MultiArray msg;
+                                        msg.data = {estimate[0], estimate[1], estimate[2]};
+                                        mRosPubEstimation.publish(msg);
+                                }
                         #endif
                 }
         }

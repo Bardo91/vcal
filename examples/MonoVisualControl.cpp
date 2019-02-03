@@ -38,8 +38,6 @@ int main(int _argc, char** _argv){
     float fx = 510;
     float fy = 510;
 
-    
-    std::vector<double> vx, vy, vz;
     std::function<Eigen::Vector3f(const cv::Mat&)> procImage = [&](const cv::Mat &_img) -> Eigen::Vector3f{
         cv::Mat hsv_image;
         if(_img.rows == 0)
@@ -70,11 +68,6 @@ int main(int _argc, char** _argv){
         float z = 3.0; // 1 meter
         float x = (center.x - cx)/fx*z;
         float y = (center.y - cy)/fy*z;
-
-        vx.push_back(x);
-        vy.push_back(y);
-        vz.push_back(z);
-
         return Eigen::Vector3f({x,y,z});
     };
     
@@ -86,17 +79,25 @@ int main(int _argc, char** _argv){
 
     // Configure PID out with fastcom
     vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
-                            vcal::VisualControlScheme::eComTypes::ROS,
+                            vcal::VisualControlScheme::eComTypes::FASTCOM,
                             {
-                                {"output_topic",       "/pid_out"},
-                                {"param_topic_out",    "/pid_params_out"},
-                                {"param_topic_in",     "/pid_params_in"}
+                                {"output_topic",       "9000"},
+                                {"param_topic_out",    "9001:9002:9003"},
+                                {"param_topic_in",     "9004:9005:9006"}
                             }
                         );
     
     vcs.configureInterface( vcal::VisualControlScheme::eModules::REFERENCE,
-                            vcal::VisualControlScheme::eComTypes::ROS,
-                            {{"input_topic", "/control_reference"}});
+                            vcal::VisualControlScheme::eComTypes::FASTCOM,
+                            {
+                                {"reference_topic", "9008"},
+                            });
+
+    vcs.configureInterface( vcal::VisualControlScheme::eModules::REFERENCE,
+                            vcal::VisualControlScheme::eComTypes::FASTCOM,
+                            {
+                                {"estimation_topic", "9007"},
+                            });
 
 
     vcs.configureInterface( vcal::VisualControlScheme::eModules::VISUALIZATION,
@@ -108,23 +109,12 @@ int main(int _argc, char** _argv){
         return -1;
     }
 
-    rgbd::Graph2d plot("plot");
-
     #ifdef HAS_ROS
         ros::AsyncSpinner spinner(4);
         spinner.start();
     #endif
 
-    int len = 200;
-    while(ros::ok()){
-        if(vx.size() > 2){
-            plot.clean();
-            plot.draw(std::vector<double>(vx.begin() + (vx.size() < len? 0: vx.size()-len ), vx.end() ),  255, 0,0,rgbd::Graph2d::eDrawType::Lines);
-            plot.draw(std::vector<double>(vy.begin() + (vy.size() < len? 0: vy.size()-len ), vy.end() ),  0, 255,0,rgbd::Graph2d::eDrawType::Lines);
-            plot.draw(std::vector<double>(vz.begin() + (vz.size() < len? 0: vz.size()-len ), vz.end() ),  0, 0,255,rgbd::Graph2d::eDrawType::Lines);
-            plot.show();
-            cv::waitKey(3);
-        }   
+    while(ros::ok()){       
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 

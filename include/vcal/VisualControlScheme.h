@@ -88,7 +88,8 @@ namespace vcal{
         ///     * VISUALIZATION:
         ///         * "stream_topic":"topic_name"       Optionally, enable streaming of image
         ///     * REFERENCE:
-        ///         * "input_topic":"topic_name"        Mandatory, topic where to read the 3D reference for the PID
+        ///         * "reference_topic":"topic_name"            Mandatory, topic where to read the 3D reference for the PID
+        ///         * "estimation_topic":"topic_name"       Mandatory, topic where to publish the 3D result of the vision algorithm
         /// *fastcom INTERFACE:
         ///     * PID:
         ///         * "output_topic":"8888"                 Port numbers where to publish result of PID
@@ -97,7 +98,8 @@ namespace vcal{
         ///     * VISUALIZATION:
         ///         * "stream_topic":"8891"         Optionally, enable port number where to stream the input image
         ///     * REFERENCE:
-        ///         * "input_topic":"8892"          Mandatory, port number where to read the 3D reference for the PID 
+        ///         * "reference_topic":"8892"                  Mandatory, port number where to read the 3D reference for the PID 
+        ///         * "estimation_topic":"topic_name"       Mandatory, port number where to publish the 3D result of the vision algorithm
         ///
         bool configureInterface(    const eModules _module, 
                                     const eComTypes _comType, 
@@ -158,12 +160,14 @@ namespace vcal{
 
         #ifdef HAS_ROS
             ros::NodeHandle             mNH;
+            ros::Publisher              mRosPubEstimation;
             ros::Publisher              mRosPubPIDOut;
             ros::Subscriber             mRosSubPIDRef;
             image_transport::Publisher  mRosPubImageStream;
         #endif
 
         #ifdef HAS_FASTCOM
+            fastcom::Publisher<ControlSignal>       *mFastComPubEstimation = nullptr;
             fastcom::Publisher<ControlSignal>       *mFastComPubPIDOut = nullptr;
             fastcom::Subscriber<ControlSignal>      *mFastcomSubPIDRef = nullptr;
             fastcom::ImagePublisher                 *mFastComPubImageStream = nullptr;
