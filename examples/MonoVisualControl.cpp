@@ -79,9 +79,14 @@ int main(int _argc, char** _argv){
 
     // Configure PID out with fastcom
     vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
+                            vcal::VisualControlScheme::eComTypes::ROS,
+                            {
+                                {"output_topic",       "/mavros/cmd_vel"}
+                            }
+                        );
+    vcs.configureInterface( vcal::VisualControlScheme::eModules::PID,
                             vcal::VisualControlScheme::eComTypes::FASTCOM,
                             {
-                                {"output_topic",       "9000"},
                                 {"param_topic_out",    "9001:9002:9003"},
                                 {"param_topic_in",     "9004:9005:9006"}
                             }

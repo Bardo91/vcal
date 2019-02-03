@@ -79,6 +79,7 @@ private:
     double mBouncingFactor = 0.1;
     bool mRun = false;
     std::thread mParamPubThread;
+    int mPort;
 
     #ifdef HAS_ROS
         ros::NodeHandle mNH;

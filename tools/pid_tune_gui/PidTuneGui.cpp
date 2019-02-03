@@ -153,7 +153,7 @@ PidTuneGui::PidTuneGui( std::string _refTopic,
     });
 
     mSubscriberPidY = new fastcom::Subscriber<PIDParams>(_pidComParams["uav_address"], atoi(_pidComParams["port_pid_y"].c_str()));
-    mSubscriberPidX->attachCallback([&](const PIDParams &_params){
+    mSubscriberPidY->attachCallback([&](const PIDParams &_params){
         mWidgetsParams["Y kp"]->setValue(_params.kp);
         mWidgetsParams["Y ki"]->setValue(_params.ki);
         mWidgetsParams["Y kd"]->setValue(_params.kd);
@@ -162,7 +162,7 @@ PidTuneGui::PidTuneGui( std::string _refTopic,
     });
     
     mSubscriberPidZ = new fastcom::Subscriber<PIDParams>(_pidComParams["uav_address"], atoi(_pidComParams["port_pid_z"].c_str()));
-    mSubscriberPidX->attachCallback([&](const PIDParams &_params){
+    mSubscriberPidZ->attachCallback([&](const PIDParams &_params){
         mWidgetsParams["Z kp"]->setValue(_params.kp);
         mWidgetsParams["Z ki"]->setValue(_params.ki);
         mWidgetsParams["Z kd"]->setValue(_params.kd);
