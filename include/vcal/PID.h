@@ -88,7 +88,7 @@ private:
     #endif
 
     #ifdef HAS_FASTCOM
-        fastcom::Publisher<PIDParams> *mFastcomPubParams;
-        fastcom::Subscriber<PIDParams> *mFastcomSubParams;
+        fastcom::Publisher<PIDParams> *mFastcomPubParams = nullptr;
+        fastcom::Subscriber<PIDParams> *mFastcomSubParams = nullptr;
     #endif
 };
