@@ -292,11 +292,7 @@ namespace vcal{
                 mHasDepth =     (mCameraParams.find("depth_images")!= mCameraParams.end()) || 
                                 (mCameraParams.find("color_images_second") != mCameraParams.end());
 
-                if(     mCallbackStereo && 
-                        (       
-                                !(mCameraParams.find("color_images_second")!= mCameraParams.end()) || 
-                                !(mCameraParams.find("depth_images")!= mCameraParams.end())
-                        ) ){
+                if(mCallbackStereo && !mHasDepth){
                         std::cout << cTextRed << "Can't use stereo callback with dataset without stereo or depth images" << cTextReset << std::endl;
                         registerLog("config", "Can't use stereo callback with dataset without stereo or depth images");
                         return false;
@@ -427,7 +423,6 @@ namespace vcal{
                         mCamera->grab();
                         cv::Mat leftImage, rightImage, depthImage;
                         mCamera->rgb(leftImage, rightImage);
-                        
                         Eigen::Vector3f estimate;
                         if(mHasDepth){ // 666 assuming RGBD camera not stereo
                                 mCamera->depth(depthImage);
