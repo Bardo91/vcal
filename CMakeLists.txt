@@ -25,8 +25,8 @@ project(vcal VERSION 0.1 LANGUAGES C CXX)
 ##########################################
 ######		Configure project		######
 ##########################################
-set(BUILD_EXAMPLES ON)
-set(BUILD_TOOLS ON)
+set(BUILD_EXAMPLES OFF)
+set(BUILD_TOOLS OFF)
 
 list(APPEND VCAL_DEFINITIONS "")
 #########################################

@@ -255,6 +255,7 @@ namespace vcal{
                 cjson::Json config;
                 config["device"]["type"] = "opencv";
                 config["device"]["left"] = atoi(mCameraParams["device_id"].c_str());
+                config["device"]["right"] = "";
                 config["cloud"]["type"] = "null";
 
                 if(mCallbackStereo){
