@@ -1,20 +1,9 @@
-get_filename_component(rgbd_tools_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(vcal_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 include(CMakeFindDependencyMacro)
 
-find_package(OpenCV @OpenCV_VERSION@ REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
-
-find_package(rgbd_tools)
-
-
-if(@fastcom_FOUND@)
-    find_dependency(fastcom)
-endif(@fastcom_FOUND@)
-
-
-if(@catkin_FOUND@)
-    find_dependency(catkin REQUIRED roscpp rosbag cv_bridge image_transport sensor_msgs)
-endif(@catkin_FOUND@)
+find_dependency(PCL QUIET REQUIRED)
+find_dependency(OpenCV 3 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
 
 if(NOT TARGET vcal::vcal)
-    include("${rgbd_tools_CMAKE_DIR}/rgbd_toolsTargets.cmake")
+    include("${vcal_CMAKE_DIR}/vcalTargets.cmake")
 endif()
