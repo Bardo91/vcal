@@ -77,12 +77,12 @@ private:
     float mWindupMin, mWindupMax;
     float mLastResult, mLastError, mAccumErr;
     double mBouncingFactor = 0.1;
-    bool mRun = false;
+    bool run_ = false;
     std::thread mParamPubThread;
     int mPort;
 
     #ifdef HAS_ROS
-        ros::NodeHandle mNH;
+        ros::NodeHandle nh_;
         ros::Publisher mRosPubParams;
         ros::Subscriber mRosSubParams;
     #endif

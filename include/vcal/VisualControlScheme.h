@@ -65,6 +65,9 @@ namespace vcal{
         /// \params _imageCallback: Any function that computes a 3D reference for the control system from an input rgb image and a depth image
         VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> &_imageCallback);
 
+        /// Enable/disable debugging information
+        void verbose(bool _true);
+
         /// Set PID parameters
         /// \params _pid: pid to be tuned: x, y, or z
         /// \params _param: param to be tuned: 
@@ -148,38 +151,40 @@ namespace vcal{
         void VisualControlLoop();
 
     private:
-        rgbd::StereoCamera *mCamera = nullptr;
-        eCamerasType mCameraType = eCamerasType::NONE;
-        std::unordered_map<std::string, std::string> mCameraParams;
-        bool mHasDepth = false;
+        bool verbose_ = false;
 
-        std::function<Eigen::Vector3f(const cv::Mat &)> mCallbackMonocular;
-        std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> mCallbackStereo;
+        rgbd::StereoCamera *camera_ = nullptr;
+        eCamerasType camera_Type = eCamerasType::NONE;
+        std::unordered_map<std::string, std::string> cameraParams_;
+        bool hasDepth_ = false;
+
+        std::function<Eigen::Vector3f(const cv::Mat &)> callbackMonocular_;
+        std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> callbackStereo_;
 
         std::ofstream mLogFile;
 
         #ifdef HAS_ROS
-            ros::NodeHandle             mNH;
-            ros::Publisher              mRosPubEstimation;
-            ros::Publisher              mRosPubPIDOut;
-            ros::Subscriber             mRosSubPIDRef;
-            image_transport::Publisher  mRosPubImageStream;
+            ros::NodeHandle             nh_;
+            ros::Publisher              rosPubEstimation_;
+            ros::Publisher              rosPubPIDOut_;
+            ros::Subscriber             rosSubPIDRef_;
+            image_transport::Publisher  rosPubImageStream_;
         #endif
 
         #ifdef HAS_FASTCOM
-            fastcom::Publisher<ControlSignal>       *mFastComPubEstimation = nullptr;
-            fastcom::Publisher<ControlSignal>       *mFastComPubPIDOut = nullptr;
-            fastcom::Subscriber<ControlSignal>      *mFastcomSubPIDRef = nullptr;
-            fastcom::ImagePublisher                 *mFastComPubImageStream = nullptr;
+            fastcom::Publisher<ControlSignal>       *fastcomPubEstimation_ = nullptr;
+            fastcom::Publisher<ControlSignal>       *fastcomPubPIDOut_ = nullptr;
+            fastcom::Subscriber<ControlSignal>      *fastcomSubPIDRef_ = nullptr;
+            fastcom::ImagePublisher                 *fastcomPubImageStream_ = nullptr;
 
         #endif
 
-        std::thread mLoopThread;
-        bool mRun = false;
+        std::thread loopThread_;
+        bool run_ = false;
 
-        PID *mControllerX;
-        PID *mControllerY;
-        PID *mControllerZ;
+        PID *controllerX_;
+        PID *controllerY_;
+        PID *controllerZ_;
 
         // some ituls
         const std::string cTextRed		= "\033[31m";

@@ -60,15 +60,15 @@ float PID::update(float _val, float _incT) {
 //------------------------------------------------------------------------------------------------------------------------------
 void PID::enableRosPublisher(std::string _topic){
     #ifdef HAS_ROS
-        mRosPubParams = mNH.advertise<std_msgs::Float32MultiArray>(_topic, 1);
-        mRun = false;
+        mRosPubParams = nh_.advertise<std_msgs::Float32MultiArray>(_topic, 1);
+        run_ = false;
         if(mParamPubThread.joinable())
             mParamPubThread.join();
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        mRun = true;
+        run_ = true;
         mParamPubThread = std::thread([&](){
-            while(mRun){
+            while(run_){
                 std_msgs::Float32MultiArray data;
                 data.data = {mKp, mKi, mKd, mMaxSat, mWindupMax};
                 mRosPubParams.publish(data);
@@ -81,7 +81,7 @@ void PID::enableRosPublisher(std::string _topic){
 //------------------------------------------------------------------------------------------------------------------------------
 void PID::enableRosSubscriber(std::string _topic){
     #ifdef HAS_ROS
-        mRosSubParams = mNH.subscribe<std_msgs::Float32MultiArray>(_topic, 1, &PID::rosSubCallback, this);
+        mRosSubParams = nh_.subscribe<std_msgs::Float32MultiArray>(_topic, 1, &PID::rosSubCallback, this);
     #endif
 }
 
@@ -90,14 +90,14 @@ void PID::enableFastcomPublisher(int _port){
     #ifdef HAS_FASTCOM
         if(mFastcomPubParams) delete mFastcomPubParams;
         mFastcomPubParams = new fastcom::Publisher<PIDParams>(_port);
-        mRun = false;
+        run_ = false;
         if(mParamPubThread.joinable())
             mParamPubThread.join();
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        mRun = true;
+        run_ = true;
         mParamPubThread = std::thread([&](){
-            while(mRun){
+            while(run_){
                 PIDParams params = {mKp, mKi, mKd, mMaxSat, mWindupMax};
                 mFastcomPubParams->publish(params);
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));

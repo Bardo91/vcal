@@ -43,45 +43,53 @@ namespace vcal{
         //-------------------------------------------------------------------------------------------------------------
         VisualControlScheme::VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &)> &_imageCallback){
                 initLogFile();
-                mCallbackMonocular = _imageCallback;
+                callbackMonocular_ = _imageCallback;
                 #ifdef HAS_ROS
                         if(!ros::isInitialized()){
-                                std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
+                                if(verbose_)
+                                        std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
                                 assert(false);
                         }
                 #endif
-                mControllerX = new PID(0,0,0);
-                mControllerY = new PID(0,0,0);
-                mControllerZ = new PID(0,0,0);
+                controllerX_ = new PID(0,0,0);
+                controllerY_ = new PID(0,0,0);
+                controllerZ_ = new PID(0,0,0);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         VisualControlScheme::VisualControlScheme(std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> &_imageCallback){
                 initLogFile();
-                mCallbackStereo = _imageCallback;
+                callbackStereo_ = _imageCallback;
                 #ifdef HAS_ROS
                         if(!ros::isInitialized()){
-                                std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
+                                if(verbose_)
+                                        std::cout << cTextRed << "PLEASE INITIALIZE ROS IN YOUR MAIN APPLICATION" << cTextReset <<std::endl;
                                 assert(false);
                         }
                 #endif
-                mControllerX = new PID(0,0,0);
-                mControllerY = new PID(0,0,0);
-                mControllerZ = new PID(0,0,0);
+                controllerX_ = new PID(0,0,0);
+                controllerY_ = new PID(0,0,0);
+                controllerZ_ = new PID(0,0,0);
         } 
+
+
+        //-------------------------------------------------------------------------------------------------------------
+        void VisualControlScheme::verbose(bool _true){
+                verbose_ = _true;
+        }
 
         //-------------------------------------------------------------------------------------------------------------
         void VisualControlScheme::paramsPID(ePID _pid, ePIDParam _param, float _value){
                 PID *mController;
                 switch (_pid) {
                         case ePID::X:
-                                mController = mControllerX;
+                                mController = controllerX_;
                                 break;
                         case ePID::Y:
-                                mController = mControllerY;
+                                mController = controllerY_;
                                 break;
                         case ePID::Z:
-                                mController = mControllerZ;
+                                mController = controllerZ_;
                                 break;
                 }
 
@@ -137,32 +145,34 @@ namespace vcal{
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureImageStream(const eCamerasType _cameraType, const std::unordered_map<std::string, std::string> _params){
-                mCameraType = _cameraType;
-                mCameraParams = _params;
+                camera_Type = _cameraType;
+                cameraParams_ = _params;
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::startPipe(){
                 if(configureCamera()){
                         registerLog("config", "Starting pipeline");
-                        std::cout << cTextGreen << "Starting pipeline" << cTextReset << std::endl;
-                        mRun = true;
-                        mLoopThread = std::thread(&VisualControlScheme::VisualControlLoop, this);
+                        if(verbose_)
+                                std::cout << cTextGreen << "Starting pipeline" << cTextReset << std::endl;
+                        run_ = true;
+                        loopThread_ = std::thread(&VisualControlScheme::VisualControlLoop, this);
 
                         return true;       
                 }else{
                         registerLog("config", "Can't start pipeline");
-                        std::cout << cTextRed << "Can't start pipeline" << cTextReset << std::endl;
+                        if(verbose_)
+                                std::cout << cTextRed << "Can't start pipeline" << cTextReset << std::endl;
                         return false;
                 }
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::stopPipe(){
-                mRun = false;
+                run_ = false;
                 std::this_thread::sleep_for(std::chrono::seconds(1));
-                if(mLoopThread.joinable()){
-                        mLoopThread.join();
+                if(loopThread_.joinable()){
+                        loopThread_.join();
                 }
         }
 
@@ -191,24 +201,25 @@ namespace vcal{
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCamera(){
-                if(mCameraType == eCamerasType::NONE){
-                        std::cout << cTextRed << "Error, camera type not configured" << cTextReset << std::endl;
+                if(camera_Type == eCamerasType::NONE){
+                        if(verbose_)
+                                std::cout << cTextRed << "Error, camera type not configured" << cTextReset << std::endl;
                         registerLog("config", "Error, camera type not configured");
                         return false;
                 }else{
                         bool result = false;
-                        switch(mCameraType){
+                        switch(camera_Type){
                         case eCamerasType::KINECT:
                                 result = configureCameraKinect();
-                                mHasDepth = true;
+                                hasDepth_ = true;
                                 break;
                         case eCamerasType::REALSENSE:
                                 result = configureCameraRealsense();
-                                mHasDepth = true;
+                                hasDepth_ = true;
                                 break;
                         case eCamerasType::MONOCULAR:
                                 result = configureCameraMonocular();
-                                mHasDepth = false;
+                                hasDepth_ = false;
                                 break;
                         case eCamerasType::DATASET:
                                 result = configureCameraDataset();
@@ -216,11 +227,13 @@ namespace vcal{
                         }
 
                         if(!result){
-                                std::cout << cTextRed << "Failed camera configuration" << cTextReset << std::endl;
+                                if(verbose_)
+                                       std::cout << cTextRed << "Failed camera configuration" << cTextReset << std::endl;
                                 registerLog("config", "Failed camera configuration");
                                 return false;
                         }else{
-                                std::cout << cTextGreen << "Finished camera configuration" << cTextReset << std::endl;
+                                if(verbose_)
+                                        std::cout << cTextGreen << "Finished camera configuration" << cTextReset << std::endl;
                                 registerLog("config", "Finished camera configuration");
                                 return true;
                         }
@@ -229,14 +242,14 @@ namespace vcal{
         
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraKinect(){
-                mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Kinect);
+                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Kinect);
                 cjson::Json config;
-                return mCamera && mCamera->init(config);
+                return camera_ && camera_->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraRealsense(){
-                mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::RealSense);
+                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::RealSense);
                 cjson::Json config;
                 config["deviceId"] = 0;
                 config["syncStreams"] = true;
@@ -246,96 +259,98 @@ namespace vcal{
                 config["rgb"]["fps"]=30;
                 config["useUncolorizedPoints"] = true;
 
-                return mCamera && mCamera->init(config);
+                return camera_ && camera_->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraMonocular(){
-                mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Custom);
+                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Custom);
                 cjson::Json config;
                 config["device"]["type"] = "opencv";
-                config["device"]["left"] = atoi(mCameraParams["device_id"].c_str());
+                config["device"]["left"] = atoi(cameraParams_["device_id"].c_str());
                 config["device"]["right"] = "";
                 config["cloud"]["type"] = "null";
 
-                if(mCallbackStereo){
-                        std::cout << cTextRed << "Can't use stereo callback with monocular devices" << cTextReset << std::endl;
+                if(callbackStereo_){
+                        if(verbose_)
+                                std::cout << cTextRed << "Can't use stereo callback with monocular devices" << cTextReset << std::endl;
                         registerLog("config", "Can't use stereo callback with monocular devices");
                         return false;
                 }
 
-                return mCamera && mCamera->init(config);
+                return camera_ && camera_->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraDataset(){
-                mCamera = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
+                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
                 cjson::Json config;
                 config["input"]["pointCloud"]="";
                 config["loop_dataset"] = true;
 
-                if(mCameraParams.find("color_images")!= mCameraParams.end())
-                        config["input"]["left"]= mCameraParams["color_images"];
+                if(cameraParams_.find("color_images")!= cameraParams_.end())
+                        config["input"]["left"]= cameraParams_["color_images"];
                 else
                         return false;    
                 
-                if(mCameraParams.find("color_images_second") != mCameraParams.end())
-                        config["input"]["right"]= mCameraParams["color_images_second"];
+                if(cameraParams_.find("color_images_second") != cameraParams_.end())
+                        config["input"]["right"]= cameraParams_["color_images_second"];
                 else
                         config["input"]["right"]="";
                 
-                if(mCameraParams.find("depth_images")!= mCameraParams.end())
-                        config["input"]["depth"]= mCameraParams["depth_images"];
+                if(cameraParams_.find("depth_images")!= cameraParams_.end())
+                        config["input"]["depth"]= cameraParams_["depth_images"];
                 else
                         config["input"]["depth"]="";
 
 
-                mHasDepth =     (mCameraParams.find("depth_images")!= mCameraParams.end()) || 
-                                (mCameraParams.find("color_images_second") != mCameraParams.end());
+                hasDepth_ =     (cameraParams_.find("depth_images")!= cameraParams_.end()) || 
+                                (cameraParams_.find("color_images_second") != cameraParams_.end());
 
-                if(mCallbackStereo && !mHasDepth){
-                        std::cout << cTextRed << "Can't use stereo callback with dataset without stereo or depth images" << cTextReset << std::endl;
+                if(callbackStereo_ && !hasDepth_){
+                        if(verbose_)
+                                std::cout << cTextRed << "Can't use stereo callback with dataset without stereo or depth images" << cTextReset << std::endl;
                         registerLog("config", "Can't use stereo callback with dataset without stereo or depth images");
                         return false;
                 }
 
-                return mCamera && mCamera->init(config);
+                return camera_ && camera_->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureInterfacePID(const eComTypes _comType, std::unordered_map<std::string, std::string> _params){
                 if(_comType == eComTypes::ROS){
                         if(_params.find("output_topic") != _params.end()){
-                                if(mFastComPubPIDOut) delete mFastComPubPIDOut;
-                                mFastComPubPIDOut = nullptr;
-                                mRosPubPIDOut = mNH.advertise<std_msgs::Float32MultiArray>(_params["output_topic"], 1);
+                                if(fastcomPubPIDOut_) delete fastcomPubPIDOut_;
+                                fastcomPubPIDOut_ = nullptr;
+                                rosPubPIDOut_ = nh_.advertise<std_msgs::Float32MultiArray>(_params["output_topic"], 1);
                         }
                         if(_params.find("param_topic_out") != _params.end()){
-                                mControllerX->enableRosPublisher(_params["param_topic_out"]+"/X");
-                                mControllerY->enableRosPublisher(_params["param_topic_out"]+"/Y");
-                                mControllerZ->enableRosPublisher(_params["param_topic_out"]+"/Z");
+                                controllerX_->enableRosPublisher(_params["param_topic_out"]+"/X");
+                                controllerY_->enableRosPublisher(_params["param_topic_out"]+"/Y");
+                                controllerZ_->enableRosPublisher(_params["param_topic_out"]+"/Z");
                         }
                         if(_params.find("param_topic_in") != _params.end()){
-                                mControllerX->enableRosSubscriber(_params["param_topic_in"]+"/X");
-                                mControllerY->enableRosSubscriber(_params["param_topic_in"]+"/Y");
-                                mControllerZ->enableRosSubscriber(_params["param_topic_in"]+"/Z");
+                                controllerX_->enableRosSubscriber(_params["param_topic_in"]+"/X");
+                                controllerY_->enableRosSubscriber(_params["param_topic_in"]+"/Y");
+                                controllerZ_->enableRosSubscriber(_params["param_topic_in"]+"/Z");
                         }
                 }else if(_comType == eComTypes::FASTCOM){
                         if(_params.find("output_topic") != _params.end()){
-                                if(mRosPubPIDOut) mRosPubPIDOut = ros::Publisher();
-                                mFastComPubPIDOut = new fastcom::Publisher<ControlSignal>(atoi(_params["output_topic"].c_str()));
+                                if(rosPubPIDOut_) rosPubPIDOut_ = ros::Publisher();
+                                fastcomPubPIDOut_ = new fastcom::Publisher<ControlSignal>(atoi(_params["output_topic"].c_str()));
                         }
                         if(_params.find("param_topic_out") != _params.end()){
                                 auto ports = splitString(_params["param_topic_out"], ':');
-                                mControllerX->enableFastcomPublisher(atoi(ports[0].c_str()));
-                                mControllerY->enableFastcomPublisher(atoi(ports[1].c_str()));
-                                mControllerZ->enableFastcomPublisher(atoi(ports[2].c_str()));
+                                controllerX_->enableFastcomPublisher(atoi(ports[0].c_str()));
+                                controllerY_->enableFastcomPublisher(atoi(ports[1].c_str()));
+                                controllerZ_->enableFastcomPublisher(atoi(ports[2].c_str()));
                         }
                         if(_params.find("param_topic_in") != _params.end()){
                                 auto ports = splitString(_params["param_topic_in"], ':');
-                                mControllerX->enableFastcomSubscriber(atoi(ports[0].c_str()));
-                                mControllerY->enableFastcomSubscriber(atoi(ports[1].c_str()));
-                                mControllerZ->enableFastcomSubscriber(atoi(ports[2].c_str()));
+                                controllerX_->enableFastcomSubscriber(atoi(ports[0].c_str()));
+                                controllerY_->enableFastcomSubscriber(atoi(ports[1].c_str()));
+                                controllerZ_->enableFastcomSubscriber(atoi(ports[2].c_str()));
                         }
                 }else{
                         return false;
@@ -347,15 +362,15 @@ namespace vcal{
         bool VisualControlScheme::configureInterfaceVisualization(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
                 if(_comType == eComTypes::ROS){
                         if(_params.find("stream_topic") != _params.end()){
-                                if(mFastComPubImageStream) delete mFastComPubImageStream;
-                                mFastComPubPIDOut = nullptr;
-                                image_transport::ImageTransport it(mNH);
-                                mRosPubImageStream = it.advertise(_params["stream_topic"], 1);
+                                if(fastcomPubImageStream_) delete fastcomPubImageStream_;
+                                fastcomPubPIDOut_ = nullptr;
+                                image_transport::ImageTransport it(nh_);
+                                rosPubImageStream_ = it.advertise(_params["stream_topic"], 1);
                         }
                 }else if(_comType == eComTypes::FASTCOM){
                         if(_params.find("stream_topic") != _params.end()){
-                                if(mRosPubImageStream) mRosPubImageStream = image_transport::Publisher();
-                                mFastComPubImageStream = new fastcom::ImagePublisher(atoi(_params["stream_topic"].c_str()));
+                                if(rosPubImageStream_) rosPubImageStream_ = image_transport::Publisher();
+                                fastcomPubImageStream_ = new fastcom::ImagePublisher(atoi(_params["stream_topic"].c_str()));
                         }
                 }else{
                         return false;
@@ -367,44 +382,44 @@ namespace vcal{
         bool VisualControlScheme::configureInterfaceRefence(const eComTypes _comType,  std::unordered_map<std::string, std::string> _params){
                 if(_comType == eComTypes::ROS){
                         if(_params.find("reference_topic") != _params.end()){
-                                if(mFastcomSubPIDRef) delete mFastcomSubPIDRef;
-                                mFastcomSubPIDRef = nullptr;
-                                mRosSubPIDRef = mNH.subscribe<std_msgs::Float32MultiArray>(_params["reference_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
-                                        if(fabs(mControllerX->reference() - _msg->data[0])> 0.05){
-                                                mControllerX->reference(_msg->data[0]);
+                                if(fastcomSubPIDRef_) delete fastcomSubPIDRef_;
+                                fastcomSubPIDRef_ = nullptr;
+                                rosSubPIDRef_ = nh_.subscribe<std_msgs::Float32MultiArray>(_params["reference_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
+                                        if(fabs(controllerX_->reference() - _msg->data[0])> 0.05){
+                                                controllerX_->reference(_msg->data[0]);
                                         }
-                                        if(fabs(mControllerY->reference() - _msg->data[1])> 0.05){
-                                                mControllerY->reference(_msg->data[1]);
+                                        if(fabs(controllerY_->reference() - _msg->data[1])> 0.05){
+                                                controllerY_->reference(_msg->data[1]);
                                         }
-                                        if(fabs(mControllerZ->reference() - _msg->data[2])> 0.05){
-                                                mControllerZ->reference(_msg->data[2]);
+                                        if(fabs(controllerZ_->reference() - _msg->data[2])> 0.05){
+                                                controllerZ_->reference(_msg->data[2]);
                                         }
                                 });
                         }if(_params.find("estimation_topic") != _params.end()){
-                                if(mFastComPubEstimation) delete mFastComPubEstimation;
-                                mFastComPubEstimation = nullptr;
-                                mRosPubEstimation = mNH.advertise<std_msgs::Float32MultiArray>(_params["estimation_topic"], 1);
+                                if(fastcomPubEstimation_) delete fastcomPubEstimation_;
+                                fastcomPubEstimation_ = nullptr;
+                                rosPubEstimation_ = nh_.advertise<std_msgs::Float32MultiArray>(_params["estimation_topic"], 1);
                         }else{
                                 return false;
                         }
                 }else if(_comType == eComTypes::FASTCOM){
                         if(_params.find("reference_topic") != _params.end()){
-                                if(mRosSubPIDRef) mRosSubPIDRef = ros::Subscriber();
-                                mFastcomSubPIDRef = new fastcom::Subscriber<ControlSignal>(atoi(_params["reference_topic"].c_str()));
-                                mFastcomSubPIDRef->attachCallback([&](const ControlSignal &_reference){
-                                        if(fabs(mControllerX->reference() - _reference.ux)> 0.05){
-                                                mControllerX->reference(_reference.ux);
+                                if(rosSubPIDRef_) rosSubPIDRef_ = ros::Subscriber();
+                                fastcomSubPIDRef_ = new fastcom::Subscriber<ControlSignal>(atoi(_params["reference_topic"].c_str()));
+                                fastcomSubPIDRef_->attachCallback([&](const ControlSignal &_reference){
+                                        if(fabs(controllerX_->reference() - _reference.ux)> 0.05){
+                                                controllerX_->reference(_reference.ux);
                                         }
-                                        if(fabs(mControllerY->reference() - _reference.uy)> 0.05){
-                                                mControllerY->reference(_reference.uy);
+                                        if(fabs(controllerY_->reference() - _reference.uy)> 0.05){
+                                                controllerY_->reference(_reference.uy);
                                         }
-                                        if(fabs(mControllerZ->reference() - _reference.uz)> 0.05){
-                                                mControllerZ->reference(_reference.uz);
+                                        if(fabs(controllerZ_->reference() - _reference.uz)> 0.05){
+                                                controllerZ_->reference(_reference.uz);
                                         }
                                 });
                         }if(_params.find("estimation_topic") != _params.end()){
-                                if(mRosPubEstimation) mRosPubEstimation = ros::Publisher();
-                                mFastComPubEstimation = new fastcom::Publisher<ControlSignal>(atoi(_params["estimation_topic"].c_str()));
+                                if(rosPubEstimation_) rosPubEstimation_ = ros::Publisher();
+                                fastcomPubEstimation_ = new fastcom::Publisher<ControlSignal>(atoi(_params["estimation_topic"].c_str()));
                         }else {
                                 return false;
                         }
@@ -419,52 +434,52 @@ namespace vcal{
         void VisualControlScheme::VisualControlLoop(){
                 auto t0 = std::chrono::system_clock::now();
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
-                while(mRun){
+                while(run_){
                         auto t1 = std::chrono::system_clock::now();
-                        mCamera->grab();
+                        camera_->grab();
                         cv::Mat leftImage, rightImage, depthImage;
-                        mCamera->rgb(leftImage, rightImage);
+                        camera_->rgb(leftImage, rightImage);
                         Eigen::Vector3f estimate;
-                        if(mHasDepth){ // 666 assuming RGBD camera not stereo
-                                mCamera->depth(depthImage);
-                                estimate = mCallbackStereo(leftImage, depthImage);
+                        if(hasDepth_){ // 666 assuming RGBD camera not stereo
+                                camera_->depth(depthImage);
+                                estimate = callbackStereo_(leftImage, depthImage);
                         }else{
-                                estimate = mCallbackMonocular(leftImage);
+                                estimate = callbackMonocular_(leftImage);
                         }
 
                         //std::cout << estimate.transpose() <<std::endl;
                         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count()/1000.0;
                         t0 = t1;
-                        float uX = mControllerX->update(estimate[0],diff);
-                        float uY = mControllerY->update(estimate[1],diff);
-                        float uZ = mControllerZ->update(estimate[2],diff);
+                        float uX = controllerX_->update(estimate[0],diff);
+                        float uY = controllerY_->update(estimate[1],diff);
+                        float uZ = controllerZ_->update(estimate[2],diff);
                         #ifdef HAS_FASTCOM
-                                if(mFastComPubPIDOut){
+                                if(fastcomPubPIDOut_){
                                         ControlSignal signal = {uX, uY, uZ};
-                                        mFastComPubPIDOut->publish(signal);
+                                        fastcomPubPIDOut_->publish(signal);
                                 }
-                                if(mFastComPubImageStream){
-                                        mFastComPubImageStream->publish(leftImage);
+                                if(fastcomPubImageStream_){
+                                        fastcomPubImageStream_->publish(leftImage);
                                 }
-                                if(mFastComPubEstimation) {
+                                if(fastcomPubEstimation_) {
                                         ControlSignal estimation = {estimate[0], estimate[1], estimate[2]};
-                                        mFastComPubEstimation->publish(estimation);
+                                        fastcomPubEstimation_->publish(estimation);
                                 }
                         #endif
                         #ifdef HAS_ROS
-                                if(mRosPubPIDOut){
+                                if(rosPubPIDOut_){
                                         std_msgs::Float32MultiArray msg;
                                         msg.data = {uX, uY, uZ};
-                                        mRosPubPIDOut.publish(msg);
+                                        rosPubPIDOut_.publish(msg);
                                 }
-                                if(mRosPubImageStream){
+                                if(rosPubImageStream_){
                                         sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", leftImage).toImageMsg();
-                                        mRosPubImageStream.publish(msg);
+                                        rosPubImageStream_.publish(msg);
                                 }
-                                if(mRosPubEstimation){
+                                if(rosPubEstimation_){
                                         std_msgs::Float32MultiArray msg;
                                         msg.data = {estimate[0], estimate[1], estimate[2]};
-                                        mRosPubEstimation.publish(msg);
+                                        rosPubEstimation_.publish(msg);
                                 }
                         #endif
                 }
