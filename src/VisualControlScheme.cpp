@@ -51,9 +51,9 @@ namespace vcal{
                                 assert(false);
                         }
                 #endif
-                controllerX_ = new PID(0,0,0);
-                controllerY_ = new PID(0,0,0);
-                controllerZ_ = new PID(0,0,0);
+                controllerX_ = new PID(0.2,0,0,-0.3, 0.3, -10,10);
+                controllerY_ = new PID(0.2,0,0,-0.3, 0.3, -10,10);
+                controllerZ_ = new PID(0.3,0,0,-0.3, 0.3, -10,10);
         }
 
         //-------------------------------------------------------------------------------------------------------------
@@ -384,8 +384,9 @@ namespace vcal{
                         if(_params.find("reference_topic") != _params.end()){
                                 if(fastcomSubPIDRef_) delete fastcomSubPIDRef_;
                                 fastcomSubPIDRef_ = nullptr;
+
                                 rosSubPIDRef_ = nh_.subscribe<std_msgs::Float32MultiArray>(_params["reference_topic"], 1,[&](const std_msgs::Float32MultiArray::ConstPtr &_msg){
-                                        if(fabs(controllerX_->reference() - _msg->data[0])> 0.05){
+					if(fabs(controllerX_->reference() - _msg->data[0])> 0.05){
                                                 controllerX_->reference(_msg->data[0]);
                                         }
                                         if(fabs(controllerY_->reference() - _msg->data[1])> 0.05){
@@ -441,18 +442,27 @@ namespace vcal{
                         camera_->rgb(leftImage, rightImage);
                         Eigen::Vector3f estimate;
                         if(hasDepth_){ // 666 assuming RGBD camera not stereo
-                                camera_->depth(depthImage);
-                                estimate = callbackStereo_(leftImage, depthImage);
+				if(callbackStereo_){
+		                        camera_->depth(depthImage);
+		                        estimate = callbackStereo_(leftImage, depthImage);
+				}else{
+                                	estimate = callbackMonocular_(leftImage);
+				}
                         }else{
                                 estimate = callbackMonocular_(leftImage);
                         }
 
+			if(std::isnan(estimate[0]))
+				continue;
+			
                         //std::cout << estimate.transpose() <<std::endl;
+
                         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count()/1000.0;
                         t0 = t1;
                         float uX = controllerX_->update(estimate[0],diff);
                         float uY = controllerY_->update(estimate[1],diff);
                         float uZ = controllerZ_->update(estimate[2],diff);
+//std::cout << uX <<", "<< uY << ", "<<uZ <<std::endl;
                         #ifdef HAS_FASTCOM
                                 if(fastcomPubPIDOut_){
                                         ControlSignal signal = {uX, uY, uZ};

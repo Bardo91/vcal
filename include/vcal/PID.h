@@ -80,7 +80,7 @@ private:
     bool run_ = false;
     std::thread mParamPubThread;
     int mPort;
-
+    int ignoreCounter = 0;
     #ifdef HAS_ROS
         ros::NodeHandle nh_;
         ros::Publisher mRosPubParams;
