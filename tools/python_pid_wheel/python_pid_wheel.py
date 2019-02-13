@@ -65,9 +65,9 @@ class Radiodemo(QWidget):
         self.b_pid_wind = QRadioButton("wind")
         pidParam.addWidget(self.b_pid_wind)
 
-        self.pid_params_x = [0,0,0,0,0]
-        self.pid_params_y = [0,0,0,0,0]
-        self.pid_params_z = [0,0,0,0,0]
+        self.pid_params_x = [0.2,0,0,0.5,10]
+        self.pid_params_y = [0.2,0,0,0.5,10]
+        self.pid_params_z = [0.2,0,0,0.5,10]
 
         self.subPidX = fastcom.Subscriber.Subscriber(_uavAddr,_portX)
         self.subPidX.appendCallback(self.callback_X)
@@ -101,6 +101,7 @@ class Radiodemo(QWidget):
         ser = serial.Serial('/dev/ttyUSB0')  # open serial port
         while True:
             line = ser.readline()
+            print(line)
             inc = float(line)*float(self.resolution.text())
 
             newParams = self.pid_params_x
