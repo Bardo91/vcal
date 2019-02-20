@@ -67,9 +67,9 @@ namespace vcal{
                                 assert(false);
                         }
                 #endif
-                controllerX_ = new PID(0,0,0);
-                controllerY_ = new PID(0,0,0);
-                controllerZ_ = new PID(0,0,0);
+                controllerX_ = new PID(0.2,0,0,-0.3, 0.3, -10,10);
+                controllerY_ = new PID(0.2,0,0,-0.3, 0.3, -10,10);
+                controllerZ_ = new PID(0.3,0,0,-0.3, 0.3, -10,10);
         } 
 
 
@@ -181,22 +181,30 @@ namespace vcal{
                 using std::chrono::system_clock;
                 std::time_t tt = system_clock::to_time_t (system_clock::now());
                 struct std::tm * ptm = std::localtime(&tt);
-                auto timeFormat = std::put_time(ptm,"%H-%M-%S");
+                auto timeFormat = std::put_time(ptm,"%Y-%m-%d-%H-%M-%S");
                 std::stringstream timeStr;
                 timeStr << timeFormat;
                 mLogFile.open(timeStr.str()+"_vcal_log.txt");
+                mEstimateFile.open(timeStr.str()+"_vcal_log_estimate.txt");
+                mControlFile.open(timeStr.str()+"_vcal_log_control.txt");
         }
 
         //-------------------------------------------------------------------------------------------------------------
         void VisualControlScheme::registerLog(const std::string &_tag, const  std::string &_register){
                 using std::chrono::system_clock;
-                std::time_t tt = system_clock::to_time_t (system_clock::now());
+                auto now = system_clock::now();
+                std::time_t tt = system_clock::to_time_t (now);
                 struct std::tm * ptm = std::localtime(&tt);
                 auto timeFormat = std::put_time(ptm,"%H-%M-%S");
                 std::stringstream timeStr;
                 timeStr << timeFormat;
-                std::string fullRegister = "["+ timeStr.str() + "] ["+ _tag + "]\t"+_register+"\n";
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+                timeStr<< '.' << std::setfill('0') << std::setw(3) << ms.count();
+                std::string fullRegister = ""+ timeStr.str() + " ["+ _tag + "]\t"+_register+"\n";
+                mLockFile.lock();
                 mLogFile << fullRegister;
+                mLogFile.flush();
+                mLockFile.unlock();
         }
 
         //-------------------------------------------------------------------------------------------------------------
@@ -395,6 +403,8 @@ namespace vcal{
                                         if(fabs(controllerZ_->reference() - _msg->data[2])> 0.05){
                                                 controllerZ_->reference(_msg->data[2]);
                                         }
+
+                                        registerLog("visual_reference",std::to_string(_msg->data[0])+", "+std::to_string(_msg->data[1])+", "+std::to_string(_msg->data[2]));                       
                                 });
                         }if(_params.find("estimation_topic") != _params.end()){
                                 if(fastcomPubEstimation_) delete fastcomPubEstimation_;
@@ -438,6 +448,7 @@ namespace vcal{
                 while(run_){
                         auto t1 = std::chrono::system_clock::now();
                         camera_->grab();
+                        registerLog("image", "captured image");
                         cv::Mat leftImage, rightImage, depthImage;
                         camera_->rgb(leftImage, rightImage);
                         Eigen::Vector3f estimate;
@@ -451,7 +462,8 @@ namespace vcal{
                         }else{
                                 estimate = callbackMonocular_(leftImage);
                         }
-
+                        registerLog("visual_estimate",std::to_string(estimate[0])+", "+std::to_string(estimate[1])+", "+std::to_string(estimate[2]));
+                        mEstimateFile << std::to_string(estimate[0])+", "+std::to_string(estimate[1])+", "+std::to_string(estimate[2]) << std::endl; 
 			if(std::isnan(estimate[0]))
 				continue;
 			
@@ -462,7 +474,9 @@ namespace vcal{
                         float uX = controllerX_->update(estimate[0],diff);
                         float uY = controllerY_->update(estimate[1],diff);
                         float uZ = controllerZ_->update(estimate[2],diff);
-//std::cout << uX <<", "<< uY << ", "<<uZ <<std::endl;
+                        registerLog("visual_control",std::to_string(uX)+", "+std::to_string(uY)+", "+std::to_string(uZ));
+                        mControlFile << std::to_string(uX)+", "+std::to_string(uY)+", "+std::to_string(uZ) << std::endl;
+                        
                         #ifdef HAS_FASTCOM
                                 if(fastcomPubPIDOut_){
                                         ControlSignal signal = {uX, uY, uZ};

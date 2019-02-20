@@ -162,7 +162,9 @@ namespace vcal{
         std::function<Eigen::Vector3f(const cv::Mat &, const cv::Mat &)> callbackStereo_;
 
         std::ofstream mLogFile;
-
+        std::ofstream mEstimateFile, mControlFile;
+        std::mutex mLockFile;
+        
         #ifdef HAS_ROS
             ros::NodeHandle             nh_;
             ros::Publisher              rosPubEstimation_;
