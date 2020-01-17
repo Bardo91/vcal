@@ -42,12 +42,12 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/" ${CMAKE_MODUL
 
 #########################################
 ## Load opencv
-find_package(OpenCV 3 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
+find_package(OpenCV 4 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
 set_target_properties(${OpenCV_LIBS} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
 
 #########################################
-# rgbd_tools
-find_package(rgbd_tools REQUIRED)
+# mico
+find_package(mico REQUIRED)
 
 #########################################
 # Eigen
@@ -87,7 +87,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC ${VCAL_DEFINITIONS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 
 
-target_link_libraries(${PROJECT_NAME} PUBLIC rgbd_tools::rgbd_tools)
+target_link_libraries(${PROJECT_NAME} PUBLIC mico::mico-base)
 
 if(${fastcom_FOUND})
 	target_link_libraries(${PROJECT_NAME} PUBLIC fastcom::fastcom)

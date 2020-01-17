@@ -250,14 +250,14 @@ namespace vcal{
         
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraKinect(){
-                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Kinect);
+                camera_ = mico::StereoCamera::create(mico::StereoCamera::eModel::Kinect);
                 cjson::Json config;
                 return camera_ && camera_->init(config);
         }
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraRealsense(){
-                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::RealSense);
+                camera_ = mico::StereoCamera::create(mico::StereoCamera::eModel::RealSense);
                 cjson::Json config;
                 config["deviceId"] = 0;
                 config["syncStreams"] = true;
@@ -272,7 +272,7 @@ namespace vcal{
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraMonocular(){
-                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Custom);
+                camera_ = mico::StereoCamera::create(mico::StereoCamera::eModel::Custom);
                 cjson::Json config;
                 config["device"]["type"] = "opencv";
                 config["device"]["left"] = atoi(cameraParams_["device_id"].c_str());
@@ -291,7 +291,7 @@ namespace vcal{
 
         //-------------------------------------------------------------------------------------------------------------
         bool VisualControlScheme::configureCameraDataset(){
-                camera_ = rgbd::StereoCamera::create(rgbd::StereoCamera::eModel::Virtual);
+                camera_ = mico::StereoCamera::create(mico::StereoCamera::eModel::Virtual);
                 cjson::Json config;
                 config["input"]["pointCloud"]="";
                 config["loop_dataset"] = true;

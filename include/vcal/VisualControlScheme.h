@@ -28,7 +28,7 @@
 
 #include <Eigen/Eigen>
 #include <opencv2/opencv.hpp>
-#include <rgbd_tools/StereoCamera.h>
+#include <mico/base/StereoCamera.h>
 
 #ifdef HAS_ROS
     #include <ros/ros.h>
@@ -153,7 +153,7 @@ namespace vcal{
     private:
         bool verbose_ = false;
 
-        rgbd::StereoCamera *camera_ = nullptr;
+        mico::StereoCamera *camera_ = nullptr;
         eCamerasType camera_Type = eCamerasType::NONE;
         std::unordered_map<std::string, std::string> cameraParams_;
         bool hasDepth_ = false;

@@ -21,7 +21,7 @@
 
 #include <iostream>
 #include <vcal/VisualControlScheme.h>
-#include <rgbd_tools/utils/Graph2d.h>
+#include <mico/base/utils/Graph2d.h>
 #include <std_msgs/Float32.h>
 
 int main(int _argc, char** _argv){
