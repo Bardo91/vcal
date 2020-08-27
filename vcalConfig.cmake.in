@@ -2,7 +2,7 @@ get_filename_component(vcal_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 include(CMakeFindDependencyMacro)
 
 find_dependency(PCL QUIET REQUIRED)
-find_dependency(OpenCV 3 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
+find_dependency(OpenCV REQUIRED core highgui imgproc imgcodecs features2d calib3d video videoio)
 
 if(NOT TARGET vcal::vcal)
     include("${vcal_CMAKE_DIR}/vcalTargets.cmake")
