@@ -28,7 +28,7 @@
 
 #include <Eigen/Eigen>
 #include <opencv2/opencv.hpp>
-#include <mico/base/StereoCamera.h>
+#include <mico/cameras/StereoCamera.h>
 
 #ifdef HAS_ROS
     #include <ros/ros.h>

@@ -29,47 +29,6 @@ set(BUILD_EXAMPLES ON)
 set(BUILD_TOOLS OFF)
 
 list(APPEND VCAL_DEFINITIONS "")
-#########################################
-###### Loading 3rd party libraries.######
-#########################################
-if( NOT CMAKE_BUILD_TYPE )
-  set( CMAKE_BUILD_TYPE Release CACHE STRING
-       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-       FORCE )
-endif()
-
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/" ${CMAKE_MODULE_PATH})
-
-#########################################
-## Load opencv
-find_package(OpenCV 4 REQUIRED core highgui imgproc imgcodecs features2d xfeatures2d calib3d video videoio)
-set_target_properties(${OpenCV_LIBS} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
-
-#########################################
-# mico
-find_package(mico REQUIRED)
-
-#########################################
-# Eigen
-FIND_PACKAGE(Eigen3 REQUIRED)	
-
-#########################################
-# fastcom
-find_package(fastcom)
-if(${fastcom_FOUND})
-	list(APPEND VCAL_DEFINITIONS "HAS_FASTCOM")
-endif(${fastcom_FOUND})
-
-#########################################
-# catkin
-find_package(catkin REQUIRED roscpp cv_bridge image_transport sensor_msgs)
-if(${catkin_FOUND})
-	catkin_package(
-		CATKIN_DEPENDS roscpp cv_bridge image_transport sensor_msgs
-		INCLUDE_DIRS include
-	)
-	list(APPEND VCAL_DEFINITIONS "HAS_ROS")
-endif(${catkin_FOUND})
 
 #########################################
 ######			Library 		   ######
@@ -86,15 +45,57 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${VCAL_DEFINITIONS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 
+#########################################
+###### Loading 3rd party libraries.######
+#########################################
+if( NOT CMAKE_BUILD_TYPE )
+  set( CMAKE_BUILD_TYPE Release CACHE STRING
+       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+       FORCE )
+endif()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC mico::mico-base)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/" ${CMAKE_MODULE_PATH})
 
+#########################################
+## Load opencv
+find_package(OpenCV REQUIRED core highgui imgproc imgcodecs features2d calib3d video videoio)
+set_target_properties(${OpenCV_LIBS} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
+
+#########################################
+# mico cameras
+set(MICO_DEPS "cameras")
+foreach(DEP ${MICO_DEPS})
+  find_package(mico-${DEP} REQUIRED HINTS "/usr/local/lib/cmake/mico")
+  target_link_libraries(${PROJECT_NAME} LINK_PUBLIC mico::mico-${DEP})
+endforeach()
+
+#########################################
+# Eigen
+find_package(Eigen3 REQUIRED)
+if(${Eigen3_FOUND})
+  target_include_directories(${PROJECT_NAME} PUBLIC "/usr/include/eigen3")
+endif()
+
+#########################################
+# fastcom
+find_package(fastcom)
 if(${fastcom_FOUND})
-	target_link_libraries(${PROJECT_NAME} PUBLIC fastcom::fastcom)
+  target_link_libraries(${PROJECT_NAME} PUBLIC fastcom::fastcom)
+  target_compile_definitions(${PROJECT_NAME} PUBLIC FASTCOM_HAS_OPENCV HAS_FASTCOM)
 endif(${fastcom_FOUND})
 
+
+#########################################
+# catkin
+find_package(catkin REQUIRED roscpp cv_bridge image_transport sensor_msgs)
 if(${catkin_FOUND})
-	target_include_directories(${PROJECT_NAME} PUBLIC ${catkin_INCLUDE_DIRS})
+	catkin_package(
+		CATKIN_DEPENDS roscpp cv_bridge image_transport sensor_msgs
+		INCLUDE_DIRS include
+  )
+  target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_ROS)
+  
+  target_include_directories(${PROJECT_NAME} PUBLIC ${catkin_INCLUDE_DIRS})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${catkin_LIBRARIES} )
 	add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 endif(${catkin_FOUND})
